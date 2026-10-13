@@ -19,7 +19,6 @@ export type Profile = {
 export type OrganizationRef = {
   id: string
   name: string
-  slug: string
 }
 
 export type Organization = OrganizationRef & {

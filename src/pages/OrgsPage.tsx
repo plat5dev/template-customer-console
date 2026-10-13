@@ -17,7 +17,6 @@ export function OrgsPage() {
     refreshSession,
   } = useOrg()
   const [name, setName] = useState("")
-  const [slug, setSlug] = useState("")
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<unknown>(null)
 
@@ -28,10 +27,8 @@ export function OrgsPage() {
     try {
       const org = await api.createOrganization({
         name: name.trim(),
-        slug: slug.trim() || undefined,
       })
       setName("")
-      setSlug("")
       await refresh()
       setActiveOrgId(org.id)
     } catch (err) {
@@ -92,9 +89,7 @@ export function OrgsPage() {
                 >
                   {o.name}
                 </Link>
-                <div className="small text-muted font-monospace">
-                  {o.slug} · {o.id}
-                </div>
+                <div className="small text-muted font-monospace">{o.id}</div>
               </div>
               <div className="d-flex gap-2">
                 {activeOrg?.id === o.id ? (
@@ -145,20 +140,6 @@ export function OrgsPage() {
                   required
                   maxLength={128}
                   placeholder="Acme"
-                />
-              </div>
-              <div className="mb-3">
-                <label className="form-label" htmlFor="org_slug">
-                  Slug{" "}
-                  <span className="text-muted fw-normal">(optional)</span>
-                </label>
-                <input
-                  id="org_slug"
-                  className="form-control font-monospace"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
-                  maxLength={128}
-                  placeholder="derived from name if empty"
                 />
               </div>
               <button

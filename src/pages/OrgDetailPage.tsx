@@ -87,7 +87,6 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
   const [error, setError] = useState<unknown>(null)
 
   const [name, setName] = useState("")
-  const [slug, setSlug] = useState("")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -128,7 +127,6 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
         setOrg(o)
         setRoles(r)
         setName(o.name)
-        setSlug(o.slug)
         setMembers(m.some((row) => row.id === self.id) ? m : [self, ...m])
         setServiceAccounts(sas)
         void api.getProfile().then(
@@ -171,17 +169,14 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
     setError(null)
     setSaved(false)
     try {
-      const body: { name?: string; slug?: string } = {}
-      if (name.trim() !== org.name) body.name = name.trim()
-      if (slug.trim() !== org.slug) body.slug = slug.trim()
-      if (Object.keys(body).length === 0) {
+      const trimmed = name.trim()
+      if (trimmed === org.name) {
         setSaved(true)
         return
       }
-      const updated = await api.updateOrg(session.token, body)
+      const updated = await api.updateOrg(session.token, { name: trimmed })
       setOrg(updated)
       setName(updated.name)
-      setSlug(updated.slug)
       setSaved(true)
       await refreshOrgs()
     } catch (err) {
@@ -464,19 +459,6 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
                     className="form-control"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    required
-                    maxLength={128}
-                  />
-                </div>
-                <div className="mb-3">
-                  <label className="form-label" htmlFor="org_slug">
-                    Slug
-                  </label>
-                  <input
-                    id="org_slug"
-                    className="form-control font-monospace"
-                    value={slug}
-                    onChange={(e) => setSlug(e.target.value)}
                     required
                     maxLength={128}
                   />

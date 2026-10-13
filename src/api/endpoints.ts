@@ -44,7 +44,7 @@ export const api = {
     return data.memberships ?? []
   },
 
-  createOrganization: (body: { name: string; slug?: string }) =>
+  createOrganization: (body: { name: string }) =>
     apiFetch<Organization>("/user/organizations", {
       method: "POST",
       body: JSON.stringify(body),
@@ -89,7 +89,7 @@ export const api = {
 
   updateOrg: (
     sessionToken: string,
-    body: { name?: string; slug?: string },
+    body: { name?: string },
   ) =>
     apiFetch<Organization>("/org", {
       method: "PATCH",
