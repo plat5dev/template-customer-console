@@ -1,6 +1,7 @@
 import { apiFetch, type FetchAuth } from "./client"
 import type {
   ApiKeyCreated,
+  AuditEvent,
   ApiKeyListed,
   CreateApiKeyBody,
   CreateInviteBody,
@@ -16,6 +17,7 @@ import type {
   ServiceAccount,
   Task,
   TaskStatus,
+  User,
 } from "./types"
 
 /** Organization and member routes take a member session or member key. Not a user JWT. */
@@ -28,6 +30,27 @@ function enc(segment: string): string {
 }
 
 export const api = {
+  /** The signed-in person (identity's directory). */
+  getUser: () => apiFetch<User>("/user"),
+
+  /** `display_name: null` clears it. */
+  updateUser: (body: { display_name: string | null }) =>
+    apiFetch<User>("/user", {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  /** 409 ORGANIZATION_HANDOFF_REQUIRED while the last member of an org. */
+  deleteUser: () => apiFetch<void>("/user", { method: "DELETE" }),
+
+  /** The person's own audit log. Needs the audit catalog applied. */
+  listUserAuditEvents: async (limit = 20) => {
+    const data = await apiFetch<{ audit_events: AuditEvent[]; has_more: boolean }>(
+      `/user/audit-events?limit=${limit}`,
+    )
+    return data.audit_events ?? []
+  },
+
   getProfile: () => apiFetch<Profile>("/user/profile"),
 
   putProfile: (body: { display_name: string; bio?: string }) =>
@@ -115,7 +138,11 @@ export const api = {
   listRoles: (sessionToken: string) =>
     apiFetch<RolesList>("/org/roles", { auth: memberAuth(sessionToken) }),
 
-  createMember: (sessionToken: string, body: { user_id: string; role?: string }) =>
+  /** The person is named by IdP issuer and subject, never by user id. */
+  createMember: (
+    sessionToken: string,
+    body: { idp: { issuer: string; subject: string }; role?: string },
+  ) =>
     apiFetch<Member>("/org/members", {
       method: "POST",
       auth: memberAuth(sessionToken),
@@ -228,8 +255,11 @@ export const api = {
   getMember: (sessionToken: string) =>
     apiFetch<Member>("/member", { auth: memberAuth(sessionToken) }),
 
-  /** Body is `{ status }` only (`active` | `suspended`). */
-  updateMember: (sessionToken: string, body: { status: MemberPatchStatus }) =>
+  /** `display_name` is this org's override; `null` clears it. */
+  updateMember: (
+    sessionToken: string,
+    body: { status?: MemberPatchStatus; display_name?: string | null },
+  ) =>
     apiFetch<Member>("/member", {
       method: "PATCH",
       auth: memberAuth(sessionToken),
@@ -265,7 +295,7 @@ export const api = {
 
   listProjects: async (sessionToken: string) => {
     const data = await apiFetch<{ projects: Project[] }>(
-      "/member/projects",
+      "/org/projects",
       { auth: memberAuth(sessionToken) },
     )
     return data.projects ?? []
@@ -275,14 +305,14 @@ export const api = {
     sessionToken: string,
     body: { name: string; description?: string },
   ) =>
-    apiFetch<Project>("/member/projects", {
+    apiFetch<Project>("/org/projects", {
       method: "POST",
       auth: memberAuth(sessionToken),
       body: JSON.stringify(body),
     }),
 
   getProject: (sessionToken: string, projectId: string) =>
-    apiFetch<Project>(`/member/projects/${enc(projectId)}`, {
+    apiFetch<Project>(`/org/projects/${enc(projectId)}`, {
       auth: memberAuth(sessionToken),
     }),
 
@@ -291,21 +321,21 @@ export const api = {
     projectId: string,
     body: { name?: string; description?: string },
   ) =>
-    apiFetch<Project>(`/member/projects/${enc(projectId)}`, {
+    apiFetch<Project>(`/org/projects/${enc(projectId)}`, {
       method: "PATCH",
       auth: memberAuth(sessionToken),
       body: JSON.stringify(body),
     }),
 
   deleteProject: (sessionToken: string, projectId: string) =>
-    apiFetch<void>(`/member/projects/${enc(projectId)}`, {
+    apiFetch<void>(`/org/projects/${enc(projectId)}`, {
       method: "DELETE",
       auth: memberAuth(sessionToken),
     }),
 
   listTasks: async (sessionToken: string, projectId: string) => {
     const data = await apiFetch<{ tasks: Task[] }>(
-      `/member/projects/${enc(projectId)}/tasks`,
+      `/org/projects/${enc(projectId)}/tasks`,
       { auth: memberAuth(sessionToken) },
     )
     return data.tasks ?? []
@@ -316,7 +346,7 @@ export const api = {
     projectId: string,
     body: { title: string; status?: TaskStatus },
   ) =>
-    apiFetch<Task>(`/member/projects/${enc(projectId)}/tasks`, {
+    apiFetch<Task>(`/org/projects/${enc(projectId)}/tasks`, {
       method: "POST",
       auth: memberAuth(sessionToken),
       body: JSON.stringify(body),
@@ -329,7 +359,7 @@ export const api = {
     body: { title?: string; status?: TaskStatus },
   ) =>
     apiFetch<Task>(
-      `/member/projects/${enc(projectId)}/tasks/${enc(taskId)}`,
+      `/org/projects/${enc(projectId)}/tasks/${enc(taskId)}`,
       {
         method: "PATCH",
         auth: memberAuth(sessionToken),
@@ -339,7 +369,7 @@ export const api = {
 
   deleteTask: (sessionToken: string, projectId: string, taskId: string) =>
     apiFetch<void>(
-      `/member/projects/${enc(projectId)}/tasks/${enc(taskId)}`,
+      `/org/projects/${enc(projectId)}/tasks/${enc(taskId)}`,
       {
         method: "DELETE",
         auth: memberAuth(sessionToken),

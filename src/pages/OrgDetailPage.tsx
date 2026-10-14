@@ -7,7 +7,6 @@ import type {
   MemberPatchStatus,
   MemberSession,
   Organization,
-  Profile,
   RolesList,
   ServiceAccount,
 } from "../api/types"
@@ -18,6 +17,8 @@ import { MemberKeysPanel } from "../components/MemberKeysPanel"
 import { RoleSelect } from "../components/RoleSelect"
 import { ServiceAccountKeys } from "../components/ServiceAccountKeys"
 import { useOrg } from "../org/OrgContext"
+import { idpSubject } from "../auth/session"
+import { config } from "../config"
 
 const SELF_STATUSES: MemberPatchStatus[] = ["active", "suspended"]
 
@@ -82,7 +83,6 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
   const [org, setOrg] = useState<Organization | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [serviceAccounts, setServiceAccounts] = useState<ServiceAccount[]>([])
-  const [me, setMe] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<unknown>(null)
 
@@ -90,7 +90,7 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  const [memberUserId, setMemberUserId] = useState("")
+  const [memberSubject, setMemberSubject] = useState("")
   const [memberRole, setMemberRole] = useState("")
   const [adding, setAdding] = useState(false)
   const [statusSaving, setStatusSaving] = useState(false)
@@ -129,14 +129,6 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
         setName(o.name)
         setMembers(m.some((row) => row.id === self.id) ? m : [self, ...m])
         setServiceAccounts(sas)
-        void api.getProfile().then(
-          (profile) => {
-            if (!cancelled) setMe(profile)
-          },
-          () => {
-            if (!cancelled) setMe(null)
-          },
-        )
       } catch (e) {
         if (cancelled) return
         setError(e)
@@ -208,10 +200,10 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
     setError(null)
     try {
       await api.createMember(session.token, {
-        user_id: memberUserId.trim(),
+        idp: { issuer: config.authIssuer, subject: memberSubject.trim() },
         ...(memberRole ? { role: memberRole } : {}),
       })
-      setMemberUserId("")
+      setMemberSubject("")
       setMemberRole("")
       await reloadMembers()
     } catch (err) {
@@ -378,7 +370,7 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
       const sa = serviceAccounts.find((s) => s.id === m.service_account_id)
       return sa?.name ?? m.service_account_id ?? m.id
     }
-    return m.user_id ?? m.id
+    return m.display_name ?? m.id
   }
 
   if (loading) {
@@ -599,10 +591,11 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
         <div className="col-lg-7 mb-4">
           <h2 className="h5">Members</h2>
           <p className="small text-muted">
-            <code>GET/POST /org/members</code> with the member session. Your
-            user id:{" "}
-            <code className="user-select-all">{me?.user_id ?? "…"}</code>
-            {" — "}add another user’s id (from their Profile page). Service
+            <code>GET/POST /org/members</code> with the member session. A
+            person is added by IdP subject on this app’s issuer. Yours:{" "}
+            <code className="user-select-all">{idpSubject() ?? "…"}</code>
+            {" — "}add another person’s (from their Profile page). An org
+            never sees a person’s user id. Service
             accounts appear here too (<code>principal=service_account</code>).
             Your status is <code>PATCH /member</code> (<code>active</code> or{" "}
             <code>suspended</code>). Other members are{" "}
@@ -754,16 +747,16 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
                 onSubmit={(e) => void onAddMember(e)}
               >
                 <div className="col">
-                  <label className="form-label" htmlFor="member_uid">
-                    User ID
+                  <label className="form-label" htmlFor="member_subject">
+                    IdP subject
                   </label>
                   <input
-                    id="member_uid"
+                    id="member_subject"
                     className="form-control font-monospace"
-                    value={memberUserId}
-                    onChange={(e) => setMemberUserId(e.target.value)}
+                    value={memberSubject}
+                    onChange={(e) => setMemberSubject(e.target.value)}
                     required
-                    placeholder="user id from Profile"
+                    placeholder="subject from their Profile"
                   />
                 </div>
                 {roleList.length > 0 && (
@@ -785,7 +778,7 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
                     type="submit"
                     className="btn btn-primary"
                     disabled={
-                      adding || !memberUserId.trim() || !can("org:members:write")
+                      adding || !memberSubject.trim() || !can("org:members:write")
                     }
                   >
                     {adding ? "…" : "Add"}

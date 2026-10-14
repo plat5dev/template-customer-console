@@ -8,6 +8,17 @@ export type ApiErrorBody = {
   }
 }
 
+/** The signed-in person in the directory (`GET /user`). */
+export type User = {
+  id: string
+  /** The person's name everywhere an org has no override. */
+  display_name: string | null
+  status: "active" | "suspended"
+  created_at: string
+  updated_at: string
+}
+
+/** The template service's profile: app data keyed by the person's directory id. */
 export type Profile = {
   user_id: string
   display_name: string
@@ -44,8 +55,9 @@ export type Member = {
   id: string
   organization_id: string
   principal: "user" | "service_account"
-  user_id: string | null
   service_account_id: string | null
+  /** This org's override, else the person's name, else null. A service account's name. */
+  display_name: string | null
   role: string | null
   status: MemberStatus
   created_at: string
@@ -85,7 +97,6 @@ export type Project = {
   organization_id: string
   name: string
   description: string
-  created_by_member_id: string
   created_at: string
   updated_at: string
 }
@@ -98,7 +109,6 @@ export type Task = {
   project_id: string
   title: string
   status: TaskStatus
-  created_by_member_id: string
   created_at: string
   updated_at: string
 }
@@ -154,4 +164,29 @@ export type CreateInviteBody = {
   role?: string
   expires_in_seconds?: number
   max_uses?: number | null
+}
+
+/** 409 ORGANIZATION_HANDOFF_REQUIRED on `DELETE /user`. */
+export type HandoffDetails = {
+  organizations: OrganizationRef[]
+}
+
+/** One event in the person's audit log (`GET /user/audit-events`). */
+export type AuditEvent = {
+  id: string
+  occurred_at: string
+  request_id: string
+  organization_id: string | null
+  actor: {
+    member_id: string | null
+    auth_type: string
+    key_prefix: string | null
+  }
+  service: string
+  method: string
+  route: string
+  outcome: "pending" | "rejected" | "responded" | "no_response"
+  status: number | null
+  details: Record<string, unknown> | null
+  created_id: string | null
 }

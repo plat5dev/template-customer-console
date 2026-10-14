@@ -13,9 +13,6 @@ export const config = {
     `${window.location.origin}/callback`,
   ),
   authAudience: (import.meta.env.VITE_AUTH_AUDIENCE as string | undefined) || undefined,
-  apiKeyBrand: required("VITE_APIKEY_BRAND", "plat5"),
+  /** Same claim path as the gateway's AUTH_USER_ID_CLAIM. */
+  authUserIdClaim: required("VITE_AUTH_USER_ID_CLAIM", "properties.user_id"),
 } as const
-
-export const userKeyPrefix = `${config.apiKeyBrand}-sk-1-`
-export const memberKeyPrefix = `${config.apiKeyBrand}-mk-1-`
-export const memberSessionPrefix = `${config.apiKeyBrand}-ms-1-`

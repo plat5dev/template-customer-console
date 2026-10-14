@@ -121,8 +121,8 @@ export function InvitePanel({
           no <code>invite=</code> on <code>/authorize</code>, token never in
           OAuth <code>state</code>. Then <code>POST /user/invites/redeem</code>{" "}
           with <code>{"{ token }"}</code> and the user JWT. They land as an{" "}
-          <strong>active</strong> member. Email is unbound. No SMTP. Add-by-
-          user_id below still works. Token is on the row while the invite is
+          <strong>active</strong> member. Email is unbound. No SMTP. Adding
+          by IdP subject below still works. Token is on the row while the invite is
           active. Expires in 7 days if omitted.
         </p>
         {createdInvite && createdLink && createdInvite.token && (

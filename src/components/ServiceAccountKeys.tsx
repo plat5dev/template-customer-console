@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from "react"
 import { api } from "../api/endpoints"
 import type { ApiKeyCreated, ApiKeyListed } from "../api/types"
 import { ErrorAlert } from "./ErrorAlert"
-import { memberKeyPrefix } from "../config"
 
 type Props = {
   sessionToken: string
@@ -98,8 +97,8 @@ export function ServiceAccountKeys({
     <div className="w-100 border rounded p-3 bg-body-tertiary mt-2">
       <div className="fw-semibold small mb-2">Keys</div>
       <p className="small text-muted mb-2">
-        <code>GET/POST /org/service-accounts/{serviceAccountId}/api-keys</code>{" "}
-        · prefix <code>{memberKeyPrefix}</code>. Member key for this service
+        <code>GET/POST /org/service-accounts/{serviceAccountId}/api-keys</code>.
+        Member key for this service
         account, not a separate credential. It carries the service account's
         role, not yours. Sent as <code>X-API-Key</code>.
       </p>

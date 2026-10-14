@@ -5,34 +5,21 @@ import type { ApiKeyCreated, ApiKeyListed } from "../api/types"
 import { ApiError } from "../api/client"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { useOrg } from "../org/OrgContext"
-import {
-  memberKeyPrefix,
-  memberSessionPrefix,
-  userKeyPrefix,
-} from "../config"
 
 type ProbeRow = {
   label: string
   path: string
-  expect: string
 }
 
-function credentialKind(key: string): string {
-  if (key.startsWith(memberSessionPrefix)) {
-    return `member session (${memberSessionPrefix})`
-  }
-  if (key.startsWith(memberKeyPrefix)) {
-    return `member key (${memberKeyPrefix})`
-  }
-  if (key.startsWith(userKeyPrefix)) {
-    return `user key (${userKeyPrefix})`
-  }
-  return "unknown prefix"
-}
-
-function isUserKey(key: string): boolean {
-  return key.startsWith(userKeyPrefix)
-}
+/**
+ * A user key and a member key look alike ({brand}-k-2-…): only identity knows
+ * whose a key is. Sessions are {brand}-s-2-…. Probe each scope to see where it passes.
+ */
+const probeRows: ProbeRow[] = [
+  { label: "user scope", path: "/user" },
+  { label: "organization scope", path: "/org" },
+  { label: "member scope", path: "/member" },
+]
 
 export function ApiKeysPage() {
   const { activeOrg, session } = useOrg()
@@ -43,7 +30,7 @@ export function ApiKeysPage() {
   const [error, setError] = useState<unknown>(null)
   const [created, setCreated] = useState<ApiKeyCreated | null>(null)
   const [tryKey, setTryKey] = useState("")
-  const [tryPath, setTryPath] = useState("/user/api-keys")
+  const [tryPath, setTryPath] = useState("/user")
   const [trying, setTrying] = useState(false)
   const [tryResult, setTryResult] = useState<string | null>(null)
   const [matrixRunning, setMatrixRunning] = useState(false)
@@ -133,31 +120,6 @@ export function ApiKeysPage() {
     }
   }
 
-  function probeRows(key: string): ProbeRow[] {
-    const user = isUserKey(key)
-    return [
-      {
-        label: "user scope",
-        path: "/user/api-keys",
-        expect: user ? "200 (user key)" : "401 (not a user credential)",
-      },
-      {
-        label: "organization scope",
-        path: "/org",
-        expect: user
-          ? "401 (user keys do not cover organization scope)"
-          : "200 if this member credential is admitted",
-      },
-      {
-        label: "member scope",
-        path: "/member/projects",
-        expect: user
-          ? "401 (user keys do not cover member scope)"
-          : "200 if this member credential is admitted",
-      },
-    ]
-  }
-
   async function onMatrix() {
     const key = tryKey.trim()
     if (!key) return
@@ -165,13 +127,14 @@ export function ApiKeysPage() {
     setMatrixResult(null)
     setError(null)
     try {
-      const rows = probeRows(key)
-      const parts: string[] = [`Key kind: ${credentialKind(key)}`, ""]
-      for (const row of rows) {
+      const parts: string[] = [
+        "A user key passes on user scope only; a member key or session on organization and member scope only.",
+        "",
+      ]
+      for (const row of probeRows) {
         const result = await runProbe(row.path, key)
         parts.push(`### ${row.label}`)
         parts.push(`GET ${row.path}`)
-        parts.push(`expect: ${row.expect}`)
         parts.push(result)
         parts.push("")
       }
@@ -187,10 +150,10 @@ export function ApiKeysPage() {
     <div>
       <h1 className="h3 mb-1">User API keys</h1>
       <p className="text-muted small mb-3">
-        Person credentials (<code>GET/POST /user/api-keys</code>, prefix{" "}
-        <code>{userKeyPrefix}</code>). Sent as <code>X-API-Key</code> on user
-        routes. They do not cover organization or member routes. Member keys (
-        <code>{memberKeyPrefix}</code>) are minted for the signed-in member on{" "}
+        Person credentials (<code>GET/POST /user/api-keys</code>). Sent as{" "}
+        <code>X-API-Key</code> on user routes. They do not cover organization
+        or member routes. Member keys look the same and are minted for the
+        signed-in member on{" "}
         <Link to={activeOrg ? `/orgs/${activeOrg.id}` : "/orgs"}>
           org detail
         </Link>
@@ -307,7 +270,7 @@ export function ApiKeysPage() {
                 className="form-control font-monospace"
                 value={tryKey}
                 onChange={(e) => setTryKey(e.target.value)}
-                placeholder={`${userKeyPrefix}… or ${memberKeyPrefix}…`}
+                placeholder="plat5-k-2-… or plat5-s-2-…"
                 required
               />
               {session && (
@@ -363,7 +326,7 @@ export function ApiKeysPage() {
                 <button
                   type="button"
                   className="btn btn-sm btn-outline-secondary"
-                  onClick={() => setTryPath("/member/projects")}
+                  onClick={() => setTryPath("/org/projects")}
                 >
                   projects
                 </button>

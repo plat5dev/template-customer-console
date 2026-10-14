@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from "react"
 import { api } from "../api/endpoints"
 import type { ApiKeyCreated, ApiKeyListed } from "../api/types"
 import { ErrorAlert } from "./ErrorAlert"
-import { memberKeyPrefix } from "../config"
 
 type Props = {
   sessionToken: string
@@ -88,8 +87,7 @@ export function MemberKeysPanel({ sessionToken, memberId }: Props) {
     <div className="border rounded p-3 bg-body-tertiary">
       <div className="fw-semibold small mb-2">Your member keys</div>
       <p className="small text-muted mb-2">
-        <code>GET/POST /member/api-keys</code> · prefix{" "}
-        <code>{memberKeyPrefix}</code> · member{" "}
+        <code>GET/POST /member/api-keys</code> · member{" "}
         <code className="font-monospace">{memberId}</code>. Sent as{" "}
         <code>X-API-Key</code> on organization and member routes. It carries
         this member's role. User keys do not cover those routes.

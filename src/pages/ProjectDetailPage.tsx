@@ -238,7 +238,7 @@ function ProjectDetailLoaded({
       <h1 className="h3 mb-1">{project.name}</h1>
       <p className="small font-monospace text-muted mb-3">{project.id}</p>
       <p className="small text-muted">
-        <code>/member/projects/{project.id}</code> with the member session (
+        <code>/org/projects/{project.id}</code> with the member session (
         <code>X-API-Key</code>), not a user JWT. The gateway fills the subject
         into the path.
       </p>

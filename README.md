@@ -30,11 +30,11 @@ bun run dev            # http://localhost:5173
 
 Sign in → Auth password UI (login codes in Auth issuer logs only when Auth runs with `AUTH_DEV_MODE=true` and SMTP is unset) → profile / user API keys / orgs (member session, members, copy-invite-link, service accounts and their keys, your member keys, session probe) / projects / tasks.
 
-The browser does not send subject ids. User routes use the user JWT (`Authorization: Bearer`). Opening an org mints a member session (`POST /user/organizations/{id}/session`). Organization and member routes, including `/member/projects`, send that token as `X-API-Key`, not the user JWT. The gateway fills the subject into the path. A user JWT on those routes is 401. Not an active member → session mint 404; the app does not then call `/org`.
+The browser does not send subject ids. User routes use the user JWT (`Authorization: Bearer`). Opening an org mints a member session (`POST /user/organizations/{id}/session`). Organization and member routes, including `/org/projects`, send that token as `X-API-Key`, not the user JWT. The gateway fills the subject into the path. A user JWT on those routes is 401. Not an active member → session mint 404; the app does not then call `/org`.
 
 Roles: with a roles file (`roles.yml`), the org page shows your role and its labels (from the session mint), a role picker on invite, add-member, and service-account create, and role / status / remove on other members (`PATCH` / `DELETE /org/members/{id}`). Controls whose label you lack are disabled; the gateway still decides, and a 403 names the `required_labels`. With roles off, members have no role, every member holds every label, and the role controls are hidden.
 
-Invite copy-link is `{origin}/login?invite={token}`. Already signed in: redeem immediately (skip PKCE). Else the app stashes the token in a first-party cookie (`plat5_web_demo_invite`) plus an origin stash keyed by OAuth CSRF `state`, strips the query so Referer to Auth cannot leak it, starts PKCE (Auth `/authorize` does **not** get `invite=`; token never in OAuth `state`), then `POST /user/invites/redeem` with `{ "token" }` and the user JWT. Cookie/stash clear only after a successful redeem. Add-by-`user_id` still works. Email is unbound. No SMTP.
+Invite copy-link is `{origin}/login?invite={token}`. Already signed in: redeem immediately (skip PKCE). Else the app stashes the token in a first-party cookie (`plat5_web_demo_invite`) plus an origin stash keyed by OAuth CSRF `state`, strips the query so Referer to Auth cannot leak it, starts PKCE (Auth `/authorize` does **not** get `invite=`; token never in OAuth `state`), then `POST /user/invites/redeem` with `{ "token" }` and the user JWT. Cookie/stash clear only after a successful redeem. Adding by IdP subject (shown on the Profile page) still works. Email is unbound. No SMTP.
 
 ## Env
 
@@ -45,7 +45,7 @@ Invite copy-link is `{origin}/login?invite={token}`. Already signed in: redeem i
 | `VITE_AUTH_CLIENT_ID` | `plat5` |
 | `VITE_AUTH_REDIRECT_URI` | `{window.location.origin}/callback` |
 | `VITE_AUTH_AUDIENCE` | (unset) |
-| `VITE_APIKEY_BRAND` | `plat5` |
+| `VITE_AUTH_USER_ID_CLAIM` | `properties.user_id` (the gateway's `AUTH_USER_ID_CLAIM`) |
 
 ## Auth notes
 

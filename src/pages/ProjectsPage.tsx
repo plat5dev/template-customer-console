@@ -136,7 +136,7 @@ function ProjectsLoaded({
         <div>
           <h1 className="h3 mb-1">Projects</h1>
           <p className="text-muted small mb-0">
-            Org <strong>{orgName}</strong> · <code>/member/projects</code> with
+            Org <strong>{orgName}</strong> · <code>/org/projects</code> with
             the member session (<code>X-API-Key</code>), not a user JWT. The
             gateway fills the subject into the path.
           </p>

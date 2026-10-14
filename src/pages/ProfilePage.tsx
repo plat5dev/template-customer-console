@@ -1,9 +1,18 @@
 import { useEffect, useState, type FormEvent } from "react"
 import { api } from "../api/endpoints"
-import type { Profile } from "../api/types"
+import { ApiError } from "../api/client"
+import type { AuditEvent, HandoffDetails, Profile, User } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
+import { useAuth } from "../auth/AuthContext"
+import { idpSubject } from "../auth/session"
 
 export function ProfilePage() {
+  const { logout } = useAuth()
+  const [user, setUser] = useState<User | null>(null)
+  const [name, setName] = useState("")
+  const [savingName, setSavingName] = useState(false)
+  const [events, setEvents] = useState<AuditEvent[] | null>(null)
+  const [handoff, setHandoff] = useState<HandoffDetails | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [displayName, setDisplayName] = useState("")
   const [bio, setBio] = useState("")
@@ -12,28 +21,72 @@ export function ProfilePage() {
   const [error, setError] = useState<unknown>(null)
   const [saved, setSaved] = useState(false)
 
+  async function loadEvents() {
+    try {
+      setEvents(await api.listUserAuditEvents())
+    } catch {
+      // The audit catalog may not be applied.
+      setEvents(null)
+    }
+  }
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       setLoading(true)
       setError(null)
       try {
-        const p = await api.getProfile()
-        if (!cancelled) {
-          setProfile(p)
-          setDisplayName(p.display_name)
-          setBio(p.bio)
-        }
+        const [u, p] = await Promise.all([api.getUser(), api.getProfile()])
+        if (cancelled) return
+        setUser(u)
+        setName(u.display_name ?? "")
+        setProfile(p)
+        setDisplayName(p.display_name)
+        setBio(p.bio)
       } catch (e) {
         if (!cancelled) setError(e)
       } finally {
         if (!cancelled) setLoading(false)
       }
     })()
+    void loadEvents()
     return () => {
       cancelled = true
     }
   }, [])
+
+  async function onSaveName(e: FormEvent) {
+    e.preventDefault()
+    setSavingName(true)
+    setError(null)
+    try {
+      const trimmed = name.trim()
+      setUser(await api.updateUser({ display_name: trimmed === "" ? null : trimmed }))
+      void loadEvents()
+    } catch (err) {
+      setError(err)
+    } finally {
+      setSavingName(false)
+    }
+  }
+
+  async function onDeleteAccount() {
+    if (!confirm("Delete your account? Your memberships end and your keys stop working.")) {
+      return
+    }
+    setError(null)
+    setHandoff(null)
+    try {
+      await api.deleteUser()
+      logout()
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "ORGANIZATION_HANDOFF_REQUIRED") {
+        setHandoff(err.body?.error?.details as HandoffDetails)
+        return
+      }
+      setError(err)
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -62,11 +115,104 @@ export function ProfilePage() {
     <div className="row justify-content-center">
       <div className="col-lg-7">
         <h1 className="h3 mb-3">Profile</h1>
-        <p className="text-muted small">
-          User route (<code>GET/PUT /user/profile</code>) with the user JWT.
-          The gateway fills the subject into the path.
-        </p>
         <ErrorAlert error={error} onDismiss={() => setError(null)} />
+
+        <h2 className="h5">Account</h2>
+        <p className="text-muted small">
+          Identity’s directory (<code>GET/PATCH/DELETE /user</code>) with the
+          user JWT. Your name shows on your members in every org that has not
+          set its own.
+        </p>
+        <form onSubmit={(e) => void onSaveName(e)} className="card card-body mb-4">
+          <div className="mb-3">
+            <label className="form-label text-muted small">IdP subject</label>
+            <div className="font-monospace small user-select-all">
+              {idpSubject() ?? "…"}
+            </div>
+            <div className="form-text">
+              An org adds you by this, on this app’s issuer.
+            </div>
+          </div>
+          {user && (
+            <div className="mb-3">
+              <label className="form-label text-muted small">Status</label>
+              <div className="small">{user.status}</div>
+            </div>
+          )}
+          <div className="mb-3">
+            <label className="form-label" htmlFor="account_name">
+              Name
+            </label>
+            <input
+              id="account_name"
+              className="form-control"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={128}
+              placeholder="Empty clears it"
+            />
+          </div>
+          <div className="d-flex gap-2">
+            <button type="submit" className="btn btn-primary" disabled={savingName}>
+              {savingName ? "Saving…" : "Save name"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-danger ms-auto"
+              onClick={() => void onDeleteAccount()}
+            >
+              Delete account
+            </button>
+          </div>
+          {handoff && (
+            <div className="alert alert-warning mt-3 mb-0 small">
+              Hand off or delete these organizations first. You are their last
+              member, or the last holder of the creator role:
+              <ul className="mb-0">
+                {handoff.organizations.map((o) => (
+                  <li key={o.id}>{o.name}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </form>
+
+        <h2 className="h5">Your activity</h2>
+        <p className="text-muted small">
+          <code>GET /user/audit-events</code>: what you did with your account.
+          What you do inside an org is in that org’s log.
+        </p>
+        {events === null ? (
+          <p className="small text-muted mb-4">
+            Not available. Apply the audit catalog (<code>routes.audit.yml</code>).
+          </p>
+        ) : events.length === 0 ? (
+          <p className="small text-muted mb-4">No events yet.</p>
+        ) : (
+          <ul className="list-group mb-4 small">
+            {events.map((e) => (
+              <li key={e.id} className="list-group-item">
+                <span className="font-monospace">
+                  {e.method} {e.route}
+                </span>{" "}
+                · {e.status ?? e.outcome} · {e.actor.auth_type}
+                {e.organization_id && (
+                  <>
+                    {" "}
+                    · org <code>{e.organization_id}</code>
+                  </>
+                )}
+                <div className="text-muted">{new Date(e.occurred_at).toLocaleString()}</div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <h2 className="h5">App profile</h2>
+        <p className="text-muted small">
+          The template service’s own data (<code>GET/PUT /user/profile</code>).
+          The gateway fills your directory id into the path.
+        </p>
         {saved && (
           <div className="alert alert-success py-2">Saved.</div>
         )}

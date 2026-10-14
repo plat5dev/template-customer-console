@@ -58,6 +58,27 @@ export function getStoredTokens(): TokenSet | null {
 }
 
 /**
+ * The signed-in person's IdP subject: the access token's user id claim (the
+ * gateway's AUTH_USER_ID_CLAIM). Another org adds this person by it. Display
+ * only: the token is not verified here.
+ */
+export function idpSubject(): string | null {
+  const token = loadTokens()?.access_token
+  const payload = token?.split(".")[1]
+  if (!payload) return null
+  try {
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"))
+    let v: unknown = JSON.parse(json)
+    for (const part of config.authUserIdClaim.split(".")) {
+      v = v && typeof v === "object" ? (v as Record<string, unknown>)[part] : undefined
+    }
+    return typeof v === "string" ? v : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Copy-link URL for an org invite token.
  * Origin path so this tab can stash the token, then start its own PKCE.
  * Auth `/authorize` must not receive `invite=`.

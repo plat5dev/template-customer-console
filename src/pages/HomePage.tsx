@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom"
 import { useAuth } from "../auth/AuthContext"
 import { useOrg } from "../org/OrgContext"
-import { config, memberKeyPrefix, userKeyPrefix } from "../config"
+import { config } from "../config"
 
 export function HomePage() {
   const { authenticated, login } = useAuth()
@@ -55,7 +55,7 @@ export function HomePage() {
               <strong>OIDC + PKCE</strong> → user JWT on user routes
             </li>
             <li className="list-group-item">
-              <strong>User API keys</strong> (<code>{userKeyPrefix}</code>) →
+              <strong>User API keys</strong> →
               user routes via <code>X-API-Key</code>. Not organization or member
               routes.
             </li>
@@ -65,7 +65,7 @@ export function HomePage() {
               <code>X-API-Key</code>, not the user JWT
             </li>
             <li className="list-group-item">
-              <strong>Member API keys</strong> (<code>{memberKeyPrefix}</code>) →
+              <strong>Member API keys</strong> →
               the signed-in member’s keys on <code>/member/api-keys</code>.
               Service-account keys are the same credential, minted at{" "}
               <code>/org/service-accounts/{"{id}"}/api-keys</code>
@@ -85,7 +85,7 @@ export function HomePage() {
               unbound. No SMTP.
             </li>
             <li className="list-group-item">
-              <strong>Projects / tasks</strong> → <code>/member/projects</code>{" "}
+              <strong>Projects / tasks</strong> → <code>/org/projects</code>{" "}
               with the member session
             </li>
           </ul>
