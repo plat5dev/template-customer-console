@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "web-demo",
+      "name": "template-web",
       "dependencies": {
         "bootstrap": "^5.3.8",
         "react": "^19.2.8",
