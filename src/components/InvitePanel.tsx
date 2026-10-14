@@ -21,7 +21,7 @@ export function InvitePanel({
 }: {
   sessionToken: string
   onError: (err: unknown) => void
-  /** The deployment's roles. Empty without a roles file. */
+  /** The deployment's roles. Empty with roles off. */
   roles: Role[]
   defaultRole: string | null
 }) {
@@ -220,7 +220,7 @@ export function InvitePanel({
                 empty={defaultOption(defaultRole)}
               />
               <div className="form-text">
-                The role's labels come from the deployment's roles file. Anyone
+                The role's labels come from the deployment's roles. Anyone
                 who may create invites may hand out any role, even one with more
                 labels than their own.
               </div>

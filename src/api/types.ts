@@ -41,7 +41,7 @@ export type Organization = OrganizationRef & {
 export type Membership = {
   id: string
   organization: OrganizationRef
-  /** Slug from the deployment's roles file. null when roles are off. */
+  /** Slug from the deployment's roles document. null when roles are off. */
   role: string | null
   status: "active"
 }
@@ -77,7 +77,7 @@ export type MemberSession = {
   labels: string[]
 }
 
-/** A role from the deployment's roles file. `labels: ["*"]` grants every label. */
+/** A role from the deployment's roles document. `labels: ["*"]` grants every label. */
 export type Role = {
   slug: string
   labels: string[]

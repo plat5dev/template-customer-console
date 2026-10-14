@@ -2,7 +2,7 @@ import { roleLabels } from "../api/roles"
 import type { Role } from "../api/types"
 
 /**
- * Picks a role from the deployment's roles file. Renders nothing without one.
+ * Picks a role from the deployment's roles. Renders nothing with roles off.
  * The empty option is value "": on a create it means "omit role" (the server
  * picks default_role).
  */
