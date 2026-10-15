@@ -1,27 +1,43 @@
-# Plat5 starter web
+# Web app
 
-The web app every Plat5 starter runs beside its API. It talks to Plat5 through the **gateway** and signs in with **Plat5 Auth** (browser OAuth/PKCE redirect). Profiles, user and member API keys, orgs, members, service accounts, invite links, projects, and tasks.
+Your customers' web app. It talks to Plat5 through the **gateway** and signs in with **Plat5 Auth** (browser OAuth/PKCE redirect): profile, user and member API keys, organizations, members, service accounts, invite links, projects, and tasks.
 
-Every `template-*-api` starter implements the same API (profiles, projects, tasks), so this app works with any of them. A starter's `docker-compose.yml` runs it as the `web` service from `ghcr.io/plat5dev/template-web`. A starter with its own frontend (SSR, Next.js) runs that instead.
+`plat5 init` copies it into a project's `web/` folder, beside the API starter. Every `template-*-api` starter implements the same API (profiles, projects, tasks), so it works with any of them. It is a starting point the project owns: change anything.
 
 Stack: Vite · React · TypeScript · Bootstrap 5.
 
 ## Run
 
-With a starter, `plat5 start` runs it at `http://localhost:3001`. Sign in as `dev@example.com` / `password`.
+`plat5 start` runs it at `http://localhost:3001`, with this folder mounted into the Vite dev server: edit a file and the page reloads. Sign in as `dev@example.com` / `password`.
 
-On its own, against a running stack:
+On your own machine instead, against a running stack (`plat5 start -x app`):
 
 ```bash
 bun install
 bun run dev            # http://localhost:3001
 ```
 
-`:3001` is the starter contract's web port, beside the API on `:3000`. The defaults match `plat5 start`: gateway `:5400`, Auth `:5401`. Auth must allow `http://localhost:3001/callback` as a redirect URI and `http://localhost:3001` as an origin; `plat5 start` sets both.
+`:3001` is beside the API on `:3000`. The defaults match `plat5 start`: gateway `:5400`, Auth `:5401`. Auth must allow `http://localhost:3001/callback` as a redirect URI and `http://localhost:3001` as an origin; `plat5 start` sets both (`app.web` in `plat5.yml`).
+
+## Layout
+
+```
+src/
+  pages/        one per route (App.tsx); Layout.tsx is the nav
+  api/          endpoints.ts: every call, user and org routes
+  auth/         sign-in (PKCE), the user token
+  org/          the active org, and its member session
+  components/   panels the pages share
+  learn/        the "How it works" page: how Plat5 does each page, and two probes
+```
+
+To add a page: a file in `src/pages/`, a route in `src/App.tsx`, a link in `src/components/Layout.tsx`. Organization routes send the member session (`listProjects` in `src/api/endpoints.ts`).
+
+To drop the teaching material: delete `src/learn/`, its route in `src/App.tsx`, and its link in `src/components/Layout.tsx`.
 
 ## Image
 
-`ghcr.io/plat5dev/template-web` serves the app on `:8080`. Settings are the container's environment, read at start, so one image serves any stack. Unset ones fall back to the defaults below. Images are built on `v*` tags.
+For production, the Dockerfile's last stage builds the app and serves it with nginx on `:8080`; `ghcr.io/plat5dev/template-web` is that image. Settings are the container's environment, read at start, so one image serves any stack. Unset ones fall back to the defaults below. Images are built on `v*` tags.
 
 | Container env | Build-time (`bun run dev`) | Default |
 |---------------|----------------------------|---------|

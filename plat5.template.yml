@@ -1,0 +1,15 @@
+# plat5 init copies this app into a project's web/ folder, beside the API starter.
+name: web
+kind: web
+description: Vite + React web app for your customers (sign-in, orgs, members, keys, projects)
+
+substitute:
+  - src/appName.ts
+
+# plat5 start runs it from this compose file. Its origin may sign in with local Auth.
+app:
+  compose: docker-compose.yml
+  web: http://localhost:3001
+
+exclude:
+  - .github

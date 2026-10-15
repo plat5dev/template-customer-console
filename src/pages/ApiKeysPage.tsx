@@ -2,40 +2,17 @@ import { useEffect, useState, type FormEvent } from "react"
 import { Link } from "react-router-dom"
 import { api } from "../api/endpoints"
 import type { ApiKeyCreated, ApiKeyListed } from "../api/types"
-import { ApiError } from "../api/client"
 import { ErrorAlert } from "../components/ErrorAlert"
-import { HowItWorks } from "../components/HowItWorks"
 import { useOrg } from "../org/OrgContext"
 
-type ProbeRow = {
-  label: string
-  path: string
-}
-
-/**
- * A user key and a member key look alike ({brand}-k-2-…): only identity knows
- * whose a key is. Sessions are {brand}-s-2-…. Probe each scope to see where it passes.
- */
-const probeRows: ProbeRow[] = [
-  { label: "user scope", path: "/user" },
-  { label: "organization scope", path: "/org" },
-  { label: "member scope", path: "/member" },
-]
-
 export function ApiKeysPage() {
-  const { activeOrg, session } = useOrg()
+  const { activeOrg } = useOrg()
   const [keys, setKeys] = useState<ApiKeyListed[]>([])
   const [name, setName] = useState("")
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const [created, setCreated] = useState<ApiKeyCreated | null>(null)
-  const [tryKey, setTryKey] = useState("")
-  const [tryPath, setTryPath] = useState("/user")
-  const [trying, setTrying] = useState(false)
-  const [tryResult, setTryResult] = useState<string | null>(null)
-  const [matrixRunning, setMatrixRunning] = useState(false)
-  const [matrixResult, setMatrixResult] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -63,7 +40,6 @@ export function ApiKeysPage() {
       const key = await api.createUserApiKey({ name: name.trim() })
       setName("")
       setCreated(key)
-      setTryKey(key.key)
       await load()
     } catch (err) {
       setError(err)
@@ -84,69 +60,6 @@ export function ApiKeysPage() {
     }
   }
 
-  async function runProbe(path: string, key: string): Promise<string> {
-    try {
-      const data = await api.probe<unknown>(path, {
-        mode: "api-key",
-        apiKey: key,
-      })
-      return `HTTP 200\n${JSON.stringify(data, null, 2)}`
-    } catch (err) {
-      if (err instanceof ApiError) {
-        return [
-          `HTTP ${err.status} ${err.code}`,
-          err.message,
-          err.requestId ? `request_id=${err.requestId}` : null,
-          err.body ? JSON.stringify(err.body, null, 2) : null,
-        ]
-          .filter(Boolean)
-          .join("\n")
-      }
-      throw err
-    }
-  }
-
-  async function onTry(e: FormEvent) {
-    e.preventDefault()
-    if (!tryKey.trim()) return
-    setTrying(true)
-    setTryResult(null)
-    setError(null)
-    try {
-      setTryResult(await runProbe(tryPath.trim(), tryKey.trim()))
-    } catch (err) {
-      setError(err)
-    } finally {
-      setTrying(false)
-    }
-  }
-
-  async function onMatrix() {
-    const key = tryKey.trim()
-    if (!key) return
-    setMatrixRunning(true)
-    setMatrixResult(null)
-    setError(null)
-    try {
-      const parts: string[] = [
-        "A user key passes on user scope only; a member key or session on organization and member scope only.",
-        "",
-      ]
-      for (const row of probeRows) {
-        const result = await runProbe(row.path, key)
-        parts.push(`### ${row.label}`)
-        parts.push(`GET ${row.path}`)
-        parts.push(result)
-        parts.push("")
-      }
-      setMatrixResult(parts.join("\n"))
-    } catch (err) {
-      setError(err)
-    } finally {
-      setMatrixRunning(false)
-    }
-  }
-
   return (
     <div>
       <h1 className="h3 mb-1">User API keys</h1>
@@ -155,13 +68,6 @@ export function ApiKeysPage() {
         work inside an org, use a member key from{" "}
         <Link to={activeOrg ? `/orgs/${activeOrg.id}` : "/orgs"}>that org's page</Link>.
       </p>
-      <HowItWorks>
-        <code>GET/POST /user/api-keys</code> with your sign-in. A user key is sent as{" "}
-        <code>X-API-Key</code> and admitted on user routes (<code>/user/…</code>) only. On
-        an organization or member route it is <code>401</code>: those take a member key
-        or member session. Member keys look the same; the prefix says it's a key, not
-        whose.
-      </HowItWorks>
 
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
 
@@ -181,7 +87,7 @@ export function ApiKeysPage() {
       )}
 
       <div className="row">
-        <div className="col-lg-6 mb-4">
+        <div className="col-lg-8 mb-4">
           <h2 className="h5">Your user keys</h2>
           {loading && <div className="text-muted">Loading…</div>}
           <div className="list-group">
@@ -255,138 +161,6 @@ export function ApiKeysPage() {
           </div>
         </div>
 
-        <div className="col-lg-6 mb-4">
-          <h2 className="h5">Which key works where</h2>
-          <p className="small mb-2">
-            Paste any key and call a path, or run the matrix to see each kind of key
-            against a user route and an org route.
-          </p>
-          <HowItWorks>
-            Calls the gateway with only <code>X-API-Key</code>, no user JWT. User keys are
-            admitted on user routes; member keys and member sessions on organization and
-            member routes. The wrong kind is <code>401</code>, and the message says what
-            the route takes.
-          </HowItWorks>
-          <form className="card card-body" onSubmit={(e) => void onTry(e)}>
-            <div className="mb-3">
-              <label className="form-label" htmlFor="try_key">
-                API key
-              </label>
-              <input
-                id="try_key"
-                className="form-control font-monospace"
-                value={tryKey}
-                onChange={(e) => setTryKey(e.target.value)}
-                placeholder="plat5-k-2-… or plat5-s-2-…"
-                required
-              />
-              {session && (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary mt-2"
-                  onClick={() => setTryKey(session.token)}
-                >
-                  Use member session
-                </button>
-              )}
-            </div>
-            <div className="mb-3">
-              <label className="form-label" htmlFor="try_path">
-                Path
-              </label>
-              <input
-                id="try_path"
-                className="form-control font-monospace"
-                value={tryPath}
-                onChange={(e) => setTryPath(e.target.value)}
-                required
-              />
-              <div className="form-text d-flex flex-wrap gap-2 mt-2">
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary"
-                  onClick={() => setTryPath("/user/memberships")}
-                >
-                  memberships
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary"
-                  onClick={() => setTryPath("/user/api-keys")}
-                >
-                  user keys
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary"
-                  onClick={() => setTryPath("/user/profile")}
-                >
-                  profile
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary"
-                  onClick={() => setTryPath("/org")}
-                >
-                  org
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary"
-                  onClick={() => setTryPath("/org/projects")}
-                >
-                  projects
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary"
-                  onClick={() => setTryPath("/member")}
-                >
-                  member
-                </button>
-              </div>
-            </div>
-            <div className="d-flex flex-wrap gap-2">
-              <button
-                type="submit"
-                className="btn btn-outline-primary"
-                disabled={trying || !tryKey.trim()}
-              >
-                {trying ? "Calling…" : "GET path"}
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={matrixRunning || !tryKey.trim()}
-                onClick={() => void onMatrix()}
-              >
-                {matrixRunning ? "Running…" : "Run scope matrix"}
-              </button>
-            </div>
-          </form>
-          {!activeOrg && (
-            <p className="small text-muted mt-2 mb-0">
-              Select an organization to mint a member session. Member keys are
-              on that org’s page.
-            </p>
-          )}
-          {tryResult && (
-            <pre
-              className="mt-3 p-3 bg-body-secondary rounded small overflow-auto"
-              style={{ maxHeight: "16rem" }}
-            >
-              {tryResult}
-            </pre>
-          )}
-          {matrixResult && (
-            <pre
-              className="mt-3 p-3 bg-body-secondary rounded small overflow-auto"
-              style={{ maxHeight: "28rem" }}
-            >
-              {matrixResult}
-            </pre>
-          )}
-        </div>
       </div>
     </div>
   )

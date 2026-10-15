@@ -2,14 +2,12 @@ import { useEffect, useState, type FormEvent } from "react"
 import { api } from "../api/endpoints"
 import type { ApiKeyCreated, ApiKeyListed } from "../api/types"
 import { ErrorAlert } from "./ErrorAlert"
-import { HowItWorks } from "./HowItWorks"
 
 type Props = {
   sessionToken: string
-  memberId: string
 }
 
-export function MemberKeysPanel({ sessionToken, memberId }: Props) {
+export function MemberKeysPanel({ sessionToken }: Props) {
   const [keys, setKeys] = useState<ApiKeyListed[]>([])
   const [name, setName] = useState("")
   const [loading, setLoading] = useState(true)
@@ -91,13 +89,6 @@ export function MemberKeysPanel({ sessionToken, memberId }: Props) {
         Keys that act as you in this org, with your role. For scripts that work in the
         org.
       </p>
-      <HowItWorks>
-        <code>GET/POST /member/api-keys</code> for member{" "}
-        <code className="font-monospace">{memberId}</code>. Sent as{" "}
-        <code>X-API-Key</code> on organization and member routes. A key carries its
-        member's role; change the role and the key follows. User keys don't cover these
-        routes.
-      </HowItWorks>
 
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
 

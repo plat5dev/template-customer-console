@@ -3,7 +3,6 @@ import { api } from "../api/endpoints"
 import type { CreateInviteBody, Invite, Role } from "../api/types"
 import { inviteAppUrl } from "../auth/session"
 import { defaultOption } from "../api/roles"
-import { HowItWorks } from "./HowItWorks"
 import { RoleSelect } from "./RoleSelect"
 
 const INVITE_TTL_OPTIONS: { label: string; value: string }[] = [
@@ -128,15 +127,6 @@ export function InvitePanel({
             Your role can't invite people (needs <code>org:members:write</code>).
           </p>
         )}
-        <HowItWorks>
-          <code>POST /org/invites</code> with the member session mints a token. The link is{" "}
-          <code>/login?invite=</code> on this app. The invitee's browser keeps the token
-          (a first-party cookie, and a stash keyed by the OAuth <code>state</code>), strips
-          it from the URL, and signs in with PKCE: the token never reaches{" "}
-          <code>/authorize</code>. Then <code>POST /user/invites/redeem</code> with the
-          token and their user JWT makes them an active member. Plat5 sends no email; you
-          share the link. Invites expire in 7 days unless you pick another time.
-        </HowItWorks>
         {createdInvite && createdLink && createdInvite.token && (
           <div className="alert alert-warning">
             <div className="fw-semibold mb-1">Invite minted</div>

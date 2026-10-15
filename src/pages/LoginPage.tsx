@@ -84,19 +84,12 @@ export function LoginPage() {
             <ErrorAlert error={error} onDismiss={() => setError(null)} />
             {pendingInvite ? (
               <p className="text-muted">
-                If you are already signed in, this page redeems
-                immediately (no PKCE). Otherwise the token is stashed in a
-                first-party cookie and keyed by OAuth <code>state</code> on this
-                origin — <code>invite=</code> is stripped so Referer cannot leak
-                it, and is not sent to <code>/authorize</code>. After sign-in the
-                app <code>POST /user/invites/redeem</code>s with{" "}
-                <code>{"{ token }"}</code> and the user JWT.
+                You've been invited to an organization. Sign in, or create an
+                account, and you'll join it.
               </p>
             ) : (
               <p className="text-muted">
-                Redirects to Plat5 Auth (password code). Login codes appear in
-                Auth issuer logs only when Auth runs with{" "}
-                <code>AUTH_DEV_MODE=true</code> and SMTP is unset.
+                Sign in, or create an account, to continue.
               </p>
             )}
             <button

@@ -4,7 +4,6 @@ import { api } from "../api/endpoints"
 import { holds } from "../api/roles"
 import type { AuditEvent, Member } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
-import { HowItWorks } from "../components/HowItWorks"
 import { useOrg } from "../org/OrgContext"
 
 const PAGE = 25
@@ -66,14 +65,8 @@ export function AuditLogPage() {
       <h1 className="h3 mb-1">Audit log</h1>
       <p className="mb-2">
         Every change in <strong>{activeOrg.name}</strong>: who made it, how it ended, and
-        what changed. Your API writes none of this; it only says what changed.
+        what changed.
       </p>
-      <HowItWorks>
-        <code>GET /org/audit-events</code> with the member session, newest first. The
-        gateway records each write before calling the service, then its outcome. A service
-        adds what changed with the <code>X-Plat5-Audit-Details</code> header. Reading the
-        log needs <code>org:audit:read</code>.
-      </HowItWorks>
 
       {!allowed ? (
         <p className="text-muted">

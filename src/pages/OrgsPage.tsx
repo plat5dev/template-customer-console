@@ -3,7 +3,6 @@ import { Link } from "react-router-dom"
 import { api } from "../api/endpoints"
 import { ApiError } from "../api/client"
 import { ErrorAlert } from "../components/ErrorAlert"
-import { HowItWorks } from "../components/HowItWorks"
 import { useOrg } from "../org/OrgContext"
 
 export function OrgsPage() {
@@ -46,13 +45,6 @@ export function OrgsPage() {
         <p className="mb-2">
           The organizations you belong to. Pick one to work in it.
         </p>
-        <HowItWorks>
-          <code>GET /user/memberships</code> with your sign-in; creating one is{" "}
-          <code>POST /user/organizations</code>. Picking one mints a member session (
-          <code>POST /user/organizations/{"{id}"}/session</code>), which this app keeps
-          until it expires. Organization and member calls send it as{" "}
-          <code>X-API-Key</code>, and the gateway writes the org into the path.
-        </HowItWorks>
         <ErrorAlert error={error} onDismiss={() => setError(null)} />
         <ErrorAlert error={loadError} />
         {sessionError != null && (

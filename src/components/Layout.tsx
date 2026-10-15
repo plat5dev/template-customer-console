@@ -3,6 +3,7 @@ import { NamePrompt } from "./NamePrompt"
 import { useAuth } from "../auth/AuthContext"
 import { useOrg } from "../org/OrgContext"
 import { config } from "../config"
+import { appName } from "../appName"
 
 export function Layout() {
   const { authenticated, login, logout, ready } = useAuth()
@@ -14,7 +15,7 @@ export function Layout() {
         <div className="container">
           <Link className="navbar-brand d-flex align-items-center gap-2" to="/">
             <img src="/logo.jpg" alt="" className="navbar-logo" />
-            <span>Demo</span>
+            <span>{appName}</span>
           </Link>
           <button
             className="navbar-toggler"
@@ -58,6 +59,11 @@ export function Layout() {
               </ul>
             )}
             <ul className="navbar-nav ms-auto align-items-lg-center gap-lg-2">
+              <li className="nav-item">
+                <NavLink className="nav-link" to="/learn">
+                  How it works
+                </NavLink>
+              </li>
               {authenticated && (
                 <li className="nav-item">
                   <select

@@ -3,7 +3,6 @@ import { api } from "../api/endpoints"
 import { ApiError } from "../api/client"
 import type { AuditEvent, HandoffDetails, Profile, User } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
-import { HowItWorks } from "../components/HowItWorks"
 import { useAuth } from "../auth/AuthContext"
 import { idpSubject } from "../auth/session"
 
@@ -117,11 +116,6 @@ export function ProfilePage() {
         <p className="small mb-2">
           Your name shows in every organization you're in, unless one sets its own.
         </p>
-        <HowItWorks>
-          Identity's directory (<code>GET/PATCH/DELETE /user</code>) with your sign-in. The
-          directory is private: organizations see your name and status, never your id or
-          email.
-        </HowItWorks>
         <form onSubmit={(e) => void onSaveName(e)} className="card card-body mb-4">
           <div className="mb-3">
             <label className="form-label text-muted small">IdP subject</label>
@@ -180,10 +174,6 @@ export function ProfilePage() {
         <p className="small mb-2">
           What you did with your account. What you do inside an org is in that org's log.
         </p>
-        <HowItWorks>
-          <code>GET /user/audit-events</code>. The gateway records every write, with who,
-          from where, and how it ended. Services add what changed.
-        </HowItWorks>
         {events === null ? (
           <p className="small text-muted mb-4">
             Not available. Apply the audit catalog (<code>routes.audit.yml</code>).
@@ -214,11 +204,6 @@ export function ProfilePage() {
         <p className="small mb-2">
           This app's own data about you. Your name is the one above, from your account.
         </p>
-        <HowItWorks>
-          <code>GET/PUT /user/profile</code> on your API. The gateway writes your directory
-          id into the path (<code>/users/{"{user_id}"}/profile</code>), so the API stores
-          the profile by it and never parses a token.
-        </HowItWorks>
         {saved && (
           <div className="alert alert-success py-2">Saved.</div>
         )}

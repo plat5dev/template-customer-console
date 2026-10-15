@@ -17,9 +17,7 @@ import { MemberKeysPanel } from "../components/MemberKeysPanel"
 import { RoleSelect } from "../components/RoleSelect"
 import { ServiceAccountKeys } from "../components/ServiceAccountKeys"
 import { useOrg } from "../org/OrgContext"
-import { idpSubject } from "../auth/session"
 import { config } from "../config"
-import { HowItWorks } from "../components/HowItWorks"
 
 const SELF_STATUSES: MemberPatchStatus[] = ["active", "suspended"]
 
@@ -107,9 +105,6 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
   // The session's role labels. The gateway decides; these only hide what it would refuse.
   const can = (label: string) => holds(session.labels, label)
 
-  const [probeOrgId, setProbeOrgId] = useState("")
-  const [probing, setProbing] = useState(false)
-  const [probeResult, setProbeResult] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -320,52 +315,6 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
     }
   }
 
-  async function onProbe(e: FormEvent) {
-    e.preventDefault()
-    const id = probeOrgId.trim()
-    if (!id) return
-    setProbing(true)
-    setProbeResult(null)
-    setError(null)
-    const path = `POST /user/organizations/${id}/session`
-    try {
-      const minted = await api.createMemberSession(id)
-      setProbeResult(
-        [
-          path,
-          "HTTP 201",
-          "Member session. Send as X-API-Key on organization and member routes.",
-          "This probe does not replace the app session, and does not call /org with the user JWT.",
-          minted.token,
-          `member_id=${minted.member_id}`,
-          `organization_id=${minted.organization_id}`,
-          `expires_at=${minted.expires_at}`,
-        ].join("\n"),
-      )
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setProbeResult(
-          [
-            path,
-            `HTTP ${err.status} ${err.code}`,
-            err.message,
-            err.requestId ? `request_id=${err.requestId}` : null,
-            "",
-            err.status === 404
-              ? "Not an active member. Organization routes are not called with the user JWT."
-              : null,
-          ]
-            .filter((line) => line !== null)
-            .join("\n"),
-        )
-      } else {
-        setError(err)
-      }
-    } finally {
-      setProbing(false)
-    }
-  }
-
   function memberLabel(m: Member): string {
     if (m.principal === "service_account") {
       const sa = serviceAccounts.find((s) => s.id === m.service_account_id)
@@ -428,13 +377,6 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
         </div>
       </div>
 
-      <HowItWorks>
-        Everything on this page uses your member session for this org (
-        <code>X-API-Key</code>), not your sign-in. <code>GET/PATCH/DELETE /org</code>{" "}
-        reaches identity as <code>/organizations/{"{organization_id}"}</code>: the gateway
-        writes the org in. Buttons your role can't use are disabled; the gateway would
-        answer <code>403</code> anyway.
-      </HowItWorks>
 
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
       {saved && <div className="alert alert-success py-2">Saved.</div>}
@@ -477,10 +419,6 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
                 Members for machines: CI, a backend job, an integration. They have a role
                 and keys, and belong to this org.
               </p>
-              <HowItWorks>
-                Creating one adds a service account and an active member with the role you
-                pick, not yours. Its keys are member keys, minted here.
-              </HowItWorks>
               <div className="list-group mb-3">
                 {serviceAccounts.length === 0 && (
                   <div className="list-group-item text-muted">None yet.</div>
@@ -599,16 +537,6 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
           <p className="small mb-2">
             Who is in this org, and their role. Invite people below.
           </p>
-          <HowItWorks>
-            <code>GET/POST /org/members</code> with the member session. The org never sees
-            a person's user id: you can also add someone by their IdP subject, from their
-            Profile page (yours:{" "}
-            <code className="user-select-all">{idpSubject() ?? "…"}</code>). Service
-            accounts are listed too (<code>principal=service_account</code>). Your own
-            status is <code>PATCH /member</code>; others are{" "}
-            <code>PATCH/DELETE /org/members/{"{id}"}</code>. Whoever holds{" "}
-            <code>org:members:write</code> may assign any role, including to themselves.
-          </HowItWorks>
 
           <div className="list-group mb-3">
             {members.length === 0 && (
@@ -734,7 +662,6 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
           <div className="mb-4">
             <MemberKeysPanel
               sessionToken={session.token}
-              memberId={session.member_id}
             />
           </div>
 
@@ -795,49 +722,6 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
             </div>
           </div>
 
-          <h2 className="h5">Try another org</h2>
-          <p className="small mb-2">
-            Ask for a member session in any org by id. You only get one where you're an
-            active member.
-          </p>
-          <HowItWorks>
-            <code>POST /user/organizations/{"{id}"}/session</code> with your sign-in. Not an
-            active member is <strong>404</strong>, the same as an org that doesn't exist. A
-            user JWT on <code>/org</code> is <code>401</code>; this probe doesn't send one.
-          </HowItWorks>
-          <form className="card card-body" onSubmit={(e) => void onProbe(e)}>
-            <div className="mb-3">
-              <label className="form-label" htmlFor="probe_org">
-                Organization ID
-              </label>
-              <input
-                id="probe_org"
-                className="form-control font-monospace"
-                value={probeOrgId}
-                onChange={(e) => setProbeOrgId(e.target.value)}
-                placeholder="another org id or random ULID"
-                required
-              />
-              <div className="form-text">
-                Tip: create a second org, copy its id, switch back here.
-              </div>
-            </div>
-            <button
-              type="submit"
-              className="btn btn-outline-secondary"
-              disabled={probing || !probeOrgId.trim()}
-            >
-              {probing ? "Probing…" : "Mint session"}
-            </button>
-          </form>
-          {probeResult && (
-            <pre
-              className="mt-3 p-3 bg-body-secondary rounded small overflow-auto"
-              style={{ maxHeight: "16rem" }}
-            >
-              {probeResult}
-            </pre>
-          )}
         </div>
       </div>
     </div>

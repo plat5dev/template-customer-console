@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from "react"
 import { api } from "../api/endpoints"
 import type { ApiKeyCreated, ApiKeyListed } from "../api/types"
 import { ErrorAlert } from "./ErrorAlert"
-import { HowItWorks } from "./HowItWorks"
 
 type Props = {
   sessionToken: string
@@ -100,10 +99,6 @@ export function ServiceAccountKeys({
       <p className="small mb-2">
         Keys for this service account. They carry its role, not yours.
       </p>
-      <HowItWorks>
-        <code>GET/POST /org/service-accounts/{serviceAccountId}/api-keys</code>. A member
-        key like any other, sent as <code>X-API-Key</code>.
-      </HowItWorks>
 
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
 

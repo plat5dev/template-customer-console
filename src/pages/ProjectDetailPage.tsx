@@ -5,7 +5,6 @@ import { ApiError } from "../api/client"
 import type { MemberSession, Project, Task, TaskStatus } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { useOrg } from "../org/OrgContext"
-import { HowItWorks } from "../components/HowItWorks"
 
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "done"]
 
@@ -238,11 +237,6 @@ function ProjectDetailLoaded({
 
       <h1 className="h3 mb-1">{project.name}</h1>
       <p className="small font-monospace text-muted mb-3">{project.id}</p>
-      <HowItWorks>
-        <code>/org/projects/{project.id}</code> with the member session. Your API gets{" "}
-        <code>/organizations/{"{organization_id}"}/projects/{project.id}</code>, and only
-        finds the project if it's in that org.
-      </HowItWorks>
 
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
       {projectSaved && (

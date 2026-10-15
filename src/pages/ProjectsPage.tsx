@@ -5,7 +5,6 @@ import { ApiError } from "../api/client"
 import type { MemberSession, Project } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { useOrg } from "../org/OrgContext"
-import { HowItWorks } from "../components/HowItWorks"
 
 export function ProjectsPage() {
   const {
@@ -137,14 +136,8 @@ function ProjectsLoaded({
         <div>
           <h1 className="h3 mb-1">Projects</h1>
           <p className="small mb-0">
-            Projects in <strong>{orgName}</strong>. This is your API: it stores them by
-            org, and checks nothing else.
+            Projects in <strong>{orgName}</strong>.
           </p>
-          <HowItWorks>
-            The app calls <code>/org/projects</code> with the member session. The gateway
-            checks it, checks the role's labels, and calls your API at{" "}
-            <code>/organizations/{"{organization_id}"}/projects</code>.
-          </HowItWorks>
         </div>
       </div>
 
