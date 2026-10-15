@@ -21,7 +21,6 @@ export type User = {
 /** The template service's profile: app data keyed by the person's directory id. */
 export type Profile = {
   user_id: string
-  display_name: string
   bio: string
   created_at: string
   updated_at: string
@@ -171,7 +170,7 @@ export type HandoffDetails = {
   organizations: OrganizationRef[]
 }
 
-/** One event in the person's audit log (`GET /user/audit-events`). */
+/** One audit event: the person's log (`GET /user/audit-events`) or an org's (`GET /org/audit-events`). */
 export type AuditEvent = {
   id: string
   occurred_at: string

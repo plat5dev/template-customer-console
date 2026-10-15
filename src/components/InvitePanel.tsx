@@ -3,6 +3,7 @@ import { api } from "../api/endpoints"
 import type { CreateInviteBody, Invite, Role } from "../api/types"
 import { inviteAppUrl } from "../auth/session"
 import { defaultOption } from "../api/roles"
+import { HowItWorks } from "./HowItWorks"
 import { RoleSelect } from "./RoleSelect"
 
 const INVITE_TTL_OPTIONS: { label: string; value: string }[] = [
@@ -18,8 +19,11 @@ export function InvitePanel({
   onError,
   roles,
   defaultRole,
+  canManage,
 }: {
   sessionToken: string
+  /** The member's role holds the label the invite routes require. */
+  canManage: boolean
   onError: (err: unknown) => void
   /** The deployment's roles. Empty with roles off. */
   roles: Role[]
@@ -33,6 +37,7 @@ export function InvitePanel({
   const [copied, setCopied] = useState<"link" | "token" | null>(null)
 
   async function loadInvites() {
+    if (!canManage) return
     try {
       setInvites(await api.listInvites(sessionToken))
     } catch {
@@ -44,6 +49,9 @@ export function InvitePanel({
     let cancelled = false
     setCreatedInvite(null)
     setInvites([])
+    // The list returns live tokens, so it takes the same label as creating one.
+    // Without it the gateway answers 403: don't ask.
+    if (!canManage) return
     void (async () => {
       try {
         const list = await api.listInvites(sessionToken)
@@ -55,7 +63,7 @@ export function InvitePanel({
     return () => {
       cancelled = true
     }
-  }, [sessionToken])
+  }, [sessionToken, canManage])
 
   useEffect(() => {
     if (!copied) return
@@ -110,21 +118,25 @@ export function InvitePanel({
 
   return (
     <div className="card mb-4">
-      <div className="card-header">Copy invite link</div>
+      <div className="card-header">Invite people</div>
       <div className="card-body">
-        <p className="small text-muted">
-          Mint an invite on <code>POST /org/invites</code> with the member
-          session. Clipboard gets <code>/login?invite=</code> on this app
-          origin. Already signed in → redeem immediately (skip PKCE). Else the
-          invitee’s browser stashes the token (first-party cookie + OAuth{" "}
-          <code>state</code>-keyed stash), strips the query, and starts PKCE —
-          no <code>invite=</code> on <code>/authorize</code>, token never in
-          OAuth <code>state</code>. Then <code>POST /user/invites/redeem</code>{" "}
-          with <code>{"{ token }"}</code> and the user JWT. They land as an{" "}
-          <strong>active</strong> member. Email is unbound. No SMTP. Adding
-          by IdP subject below still works. Token is on the row while the invite is
-          active. Expires in 7 days if omitted.
+        <p className="mb-2">
+          Send someone a link. When they sign in, they join this organization.
         </p>
+        {!canManage && (
+          <p className="small text-muted">
+            Your role can't invite people (needs <code>org:members:write</code>).
+          </p>
+        )}
+        <HowItWorks>
+          <code>POST /org/invites</code> with the member session mints a token. The link is{" "}
+          <code>/login?invite=</code> on this app. The invitee's browser keeps the token
+          (a first-party cookie, and a stash keyed by the OAuth <code>state</code>), strips
+          it from the URL, and signs in with PKCE: the token never reaches{" "}
+          <code>/authorize</code>. Then <code>POST /user/invites/redeem</code> with the
+          token and their user JWT makes them an active member. Plat5 sends no email; you
+          share the link. Invites expire in 7 days unless you pick another time.
+        </HowItWorks>
         {createdInvite && createdLink && createdInvite.token && (
           <div className="alert alert-warning">
             <div className="fw-semibold mb-1">Invite minted</div>
@@ -160,7 +172,7 @@ export function InvitePanel({
           </div>
         )}
         <div className="list-group mb-3">
-          {invites.length === 0 && (
+          {canManage && invites.length === 0 && (
             <div className="list-group-item text-muted">No invites listed.</div>
           )}
           {invites.map((inv) => (
@@ -247,9 +259,10 @@ export function InvitePanel({
             <button
               type="submit"
               className="btn btn-primary w-100"
-              disabled={creatingInvite}
+              disabled={creatingInvite || !canManage}
+              title={canManage ? undefined : "Needs org:members:write"}
             >
-              {creatingInvite ? "…" : "Mint copy-link"}
+              {creatingInvite ? "…" : "Create invite link"}
             </button>
           </div>
         </form>

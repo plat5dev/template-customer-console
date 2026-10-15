@@ -1,3 +1,4 @@
+import type { MemberSession } from "../api/types"
 import { config } from "../config"
 import { randomString, sha256Challenge } from "./pkce"
 
@@ -51,6 +52,47 @@ function saveTokens(tokens: TokenSet | null): void {
 export function clearSession(): void {
   saveTokens(null)
   sessionStorage.removeItem(PKCE_KEY)
+  sessionStorage.removeItem(MEMBER_SESSIONS_KEY)
+}
+
+/** This tab's member sessions, by org id, for the person signed in. */
+const MEMBER_SESSIONS_KEY = "plat5.web-demo.member-sessions"
+/** Mint a new one this long before the cached one expires. */
+const MEMBER_SESSION_MARGIN_MS = 60_000
+
+type CachedSessions = { subject: string | null; byOrg: Record<string, MemberSession> }
+
+function loadMemberSessions(): CachedSessions {
+  try {
+    const raw = sessionStorage.getItem(MEMBER_SESSIONS_KEY)
+    const parsed = raw ? (JSON.parse(raw) as CachedSessions) : null
+    // Another person signed in on this tab: their sessions are not ours.
+    if (parsed && parsed.subject === idpSubject()) return parsed
+  } catch {
+    // fall through: start over
+  }
+  return { subject: idpSubject(), byOrg: {} }
+}
+
+/** A member session minted earlier in this tab, while it has a minute or more left. */
+export function cachedMemberSession(organizationId: string): MemberSession | null {
+  const s = loadMemberSessions().byOrg[organizationId]
+  if (!s) return null
+  const expires = Date.parse(s.expires_at)
+  if (!Number.isFinite(expires) || expires - MEMBER_SESSION_MARGIN_MS <= Date.now()) {
+    return null
+  }
+  return s
+}
+
+export function cacheMemberSession(session: MemberSession): void {
+  const all = loadMemberSessions()
+  all.byOrg[session.organization_id] = session
+  try {
+    sessionStorage.setItem(MEMBER_SESSIONS_KEY, JSON.stringify(all))
+  } catch {
+    // storage full or blocked: the next page load mints again
+  }
 }
 
 export function getStoredTokens(): TokenSet | null {

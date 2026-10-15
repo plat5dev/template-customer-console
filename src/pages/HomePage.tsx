@@ -2,6 +2,7 @@ import { Link } from "react-router-dom"
 import { useAuth } from "../auth/AuthContext"
 import { useOrg } from "../org/OrgContext"
 import { config } from "../config"
+import { HowItWorks } from "../components/HowItWorks"
 
 export function HomePage() {
   const { authenticated, login } = useAuth()
@@ -14,9 +15,9 @@ export function HomePage() {
           <img src="/logo.jpg" alt="Plat5" className="home-logo mb-3" />
           <h1 className="display-6">Plat5 web demo</h1>
           <p className="lead mb-3">
-            Sample SPA against the gateway: OIDC login, user and member API
-            keys, orgs, members, service accounts, and member-scoped projects
-            and tasks.
+            A multi-tenant app with sign-in, organizations, roles, invites, and an audit
+            log, where the API behind it writes none of that. It just reads the org from
+            the path.
           </p>
           {!authenticated ? (
             <button
@@ -49,46 +50,50 @@ export function HomePage() {
         </div>
 
         <div className="card mb-3">
-          <div className="card-header">What this demos</div>
+          <div className="card-header">Two ideas</div>
           <ul className="list-group list-group-flush">
             <li className="list-group-item">
-              <strong>OIDC + PKCE</strong> → user JWT on user routes
+              <strong>You, as a person.</strong> Your profile, your organizations, your own
+              API keys. Signing in gives you this.
             </li>
             <li className="list-group-item">
-              <strong>User API keys</strong> →
-              user routes via <code>X-API-Key</code>. Not organization or member
-              routes.
-            </li>
-            <li className="list-group-item">
-              <strong>Member session</strong> → minted for the active org;
-              organization, member, project, and task calls send it as{" "}
-              <code>X-API-Key</code>, not the user JWT
-            </li>
-            <li className="list-group-item">
-              <strong>Member API keys</strong> →
-              the signed-in member’s keys on <code>/member/api-keys</code>.
-              Service-account keys are the same credential, minted at{" "}
-              <code>/org/service-accounts/{"{id}"}/api-keys</code>
-            </li>
-            <li className="list-group-item">
-              <strong>Orgs, members, invites, service accounts</strong> → member
-              session. The gateway fills the subject into the path. Not an
-              active member → session mint <code>404</code>
-            </li>
-            <li className="list-group-item">
-              <strong>Copy invite link</strong> →{" "}
-              <code>/login?invite=token</code>; already signed in redeems
-              immediately. Else this origin stashes (cookie +{" "}
-              <code>state</code>-keyed), strips the query, PKCE with no{" "}
-              <code>invite=</code> on authorize, then{" "}
-              <code>POST /user/invites/redeem</code> with the user JWT. Email is
-              unbound. No SMTP.
-            </li>
-            <li className="list-group-item">
-              <strong>Projects / tasks</strong> → <code>/org/projects</code>{" "}
-              with the member session
+              <strong>You, inside an organization.</strong> A member, with a role. Projects
+              and everything else in the org belong to the org, not to you.
             </li>
           </ul>
+          <div className="card-body pb-0">
+            <p className="small text-muted mb-2">
+              Every credential is one of these two. The API behind this app sees the org
+              and the member, never who the person is.
+            </p>
+            <HowItWorks>
+              <ul className="mb-0">
+                <li>
+                  <strong>Sign-in</strong>: OIDC with PKCE gives a user JWT, for user routes
+                  (<code>/user/…</code>). A <strong>user API key</strong> is the same, for
+                  scripts.
+                </li>
+                <li>
+                  <strong>Member session</strong>: minted for the org you pick
+                  (<code>POST /user/organizations/{"{id}"}/session</code>), and sent as{" "}
+                  <code>X-API-Key</code> on organization and member routes (
+                  <code>/org/…</code>, <code>/member/…</code>). It exists so the API gets an
+                  org-scoped credential and never the person's id. Not an active member: the
+                  mint is <code>404</code>.
+                </li>
+                <li>
+                  <strong>Member API keys</strong> are a member's long-lived credential (
+                  <code>/member/api-keys</code>). A <strong>service account</strong> is a
+                  member with keys and no person.
+                </li>
+                <li>
+                  The gateway checks the credential, then writes the org into the path:{" "}
+                  <code>/org/projects</code> reaches the API as{" "}
+                  <code>/organizations/{"{organization_id}"}/projects</code>.
+                </li>
+              </ul>
+            </HowItWorks>
+          </div>
         </div>
 
         <div className="card">
@@ -102,11 +107,8 @@ export function HomePage() {
               Plat5 gateway on <code>{config.gatewayUrl}</code>
             </li>
             <li className="list-group-item">
-              Template API on <code>:3000</code> with routes applied
-            </li>
-            <li className="list-group-item">
-              Create an org → member session → your member keys → user key
-              probe → projects &amp; tasks
+              Your API behind the gateway, with routes applied (<code>plat5 start</code> does
+              both)
             </li>
           </ul>
         </div>

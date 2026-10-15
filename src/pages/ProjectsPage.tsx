@@ -5,6 +5,7 @@ import { ApiError } from "../api/client"
 import type { MemberSession, Project } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { useOrg } from "../org/OrgContext"
+import { HowItWorks } from "../components/HowItWorks"
 
 export function ProjectsPage() {
   const {
@@ -135,11 +136,15 @@ function ProjectsLoaded({
       <div className="d-flex justify-content-between align-items-start mb-3">
         <div>
           <h1 className="h3 mb-1">Projects</h1>
-          <p className="text-muted small mb-0">
-            Org <strong>{orgName}</strong> · <code>/org/projects</code> with
-            the member session (<code>X-API-Key</code>), not a user JWT. The
-            gateway fills the subject into the path.
+          <p className="small mb-0">
+            Projects in <strong>{orgName}</strong>. This is your API: it stores them by
+            org, and checks nothing else.
           </p>
+          <HowItWorks>
+            The app calls <code>/org/projects</code> with the member session. The gateway
+            checks it, checks the role's labels, and calls your API at{" "}
+            <code>/organizations/{"{organization_id}"}/projects</code>.
+          </HowItWorks>
         </div>
       </div>
 

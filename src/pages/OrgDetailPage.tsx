@@ -19,6 +19,7 @@ import { ServiceAccountKeys } from "../components/ServiceAccountKeys"
 import { useOrg } from "../org/OrgContext"
 import { idpSubject } from "../auth/session"
 import { config } from "../config"
+import { HowItWorks } from "../components/HowItWorks"
 
 const SELF_STATUSES: MemberPatchStatus[] = ["active", "suspended"]
 
@@ -427,11 +428,13 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
         </div>
       </div>
 
-      <p className="small text-muted">
-        <code>GET/PATCH/DELETE /org</code> uses the member session (
-        <code>X-API-Key</code>), not the user JWT. The gateway fills the
-        subject into the path.
-      </p>
+      <HowItWorks>
+        Everything on this page uses your member session for this org (
+        <code>X-API-Key</code>), not your sign-in. <code>GET/PATCH/DELETE /org</code>{" "}
+        reaches identity as <code>/organizations/{"{organization_id}"}</code>: the gateway
+        writes the org in. Buttons your role can't use are disabled; the gateway would
+        answer <code>403</code> anyway.
+      </HowItWorks>
 
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
       {saved && <div className="alert alert-success py-2">Saved.</div>}
@@ -470,11 +473,14 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
           <div className="card mb-3">
             <div className="card-header">Service accounts</div>
             <div className="card-body">
-              <p className="small text-muted">
-                Non-human members of this org. Create adds a service account
-                and an active member. Keys are member keys, minted here for
-                that service account.
+              <p className="small mb-2">
+                Members for machines: CI, a backend job, an integration. They have a role
+                and keys, and belong to this org.
               </p>
+              <HowItWorks>
+                Creating one adds a service account and an active member with the role you
+                pick, not yours. Its keys are member keys, minted here.
+              </HowItWorks>
               <div className="list-group mb-3">
                 {serviceAccounts.length === 0 && (
                   <div className="list-group-item text-muted">None yet.</div>
@@ -590,19 +596,19 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
 
         <div className="col-lg-7 mb-4">
           <h2 className="h5">Members</h2>
-          <p className="small text-muted">
-            <code>GET/POST /org/members</code> with the member session. A
-            person is added by IdP subject on this app’s issuer. Yours:{" "}
-            <code className="user-select-all">{idpSubject() ?? "…"}</code>
-            {" — "}add another person’s (from their Profile page). An org
-            never sees a person’s user id. Service
-            accounts appear here too (<code>principal=service_account</code>).
-            Your status is <code>PATCH /member</code> (<code>active</code> or{" "}
-            <code>suspended</code>). Other members are{" "}
-            <code>PATCH/DELETE /org/members/{"{id}"}</code>. Whoever holds{" "}
-            <code>org:members:write</code> may assign any role, including to
-            themselves.
+          <p className="small mb-2">
+            Who is in this org, and their role. Invite people below.
           </p>
+          <HowItWorks>
+            <code>GET/POST /org/members</code> with the member session. The org never sees
+            a person's user id: you can also add someone by their IdP subject, from their
+            Profile page (yours:{" "}
+            <code className="user-select-all">{idpSubject() ?? "…"}</code>). Service
+            accounts are listed too (<code>principal=service_account</code>). Your own
+            status is <code>PATCH /member</code>; others are{" "}
+            <code>PATCH/DELETE /org/members/{"{id}"}</code>. Whoever holds{" "}
+            <code>org:members:write</code> may assign any role, including to themselves.
+          </HowItWorks>
 
           <div className="list-group mb-3">
             {members.length === 0 && (
@@ -737,6 +743,7 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
             onError={setError}
             roles={roleList}
             defaultRole={roles?.default_role ?? null}
+            canManage={can("org:members:write")}
           />
 
           <div className="card mb-4">
@@ -788,12 +795,16 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
             </div>
           </div>
 
-          <h2 className="h5">Member session probe</h2>
-          <p className="small text-muted">
-            <code>POST /user/organizations/{"{id}"}/session</code> with the user
-            JWT. Not an active member → <strong>404</strong>. A user JWT on{" "}
-            <code>/org</code> is 401; this probe does not send one.
+          <h2 className="h5">Try another org</h2>
+          <p className="small mb-2">
+            Ask for a member session in any org by id. You only get one where you're an
+            active member.
           </p>
+          <HowItWorks>
+            <code>POST /user/organizations/{"{id}"}/session</code> with your sign-in. Not an
+            active member is <strong>404</strong>, the same as an org that doesn't exist. A
+            user JWT on <code>/org</code> is <code>401</code>; this probe doesn't send one.
+          </HowItWorks>
           <form className="card card-body" onSubmit={(e) => void onProbe(e)}>
             <div className="mb-3">
               <label className="form-label" htmlFor="probe_org">

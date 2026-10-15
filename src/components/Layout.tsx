@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet } from "react-router-dom"
+import { NamePrompt } from "./NamePrompt"
 import { useAuth } from "../auth/AuthContext"
 import { useOrg } from "../org/OrgContext"
 import { config } from "../config"
@@ -42,6 +43,11 @@ export function Layout() {
                 <li className="nav-item">
                   <NavLink className="nav-link" to="/projects">
                     Projects
+                  </NavLink>
+                </li>
+                <li className="nav-item">
+                  <NavLink className="nav-link" to="/audit">
+                    Audit log
                   </NavLink>
                 </li>
                 <li className="nav-item">
@@ -99,6 +105,7 @@ export function Layout() {
         </div>
       </nav>
       <main className="container pb-5">
+        <NamePrompt />
         <Outlet />
       </main>
       <footer className="border-top py-3 mt-auto">

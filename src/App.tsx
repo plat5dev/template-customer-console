@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
+import { AuditLogPage } from "./pages/AuditLogPage"
 import { AuthProvider } from "./auth/AuthContext"
 import { Layout } from "./components/Layout"
 import { RequireAuth } from "./components/RequireAuth"
@@ -68,6 +69,14 @@ export default function App() {
                 element={
                   <RequireAuth>
                     <ProjectDetailPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="audit"
+                element={
+                  <RequireAuth>
+                    <AuditLogPage />
                   </RequireAuth>
                 }
               />

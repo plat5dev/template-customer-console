@@ -53,7 +53,7 @@ export const api = {
 
   getProfile: () => apiFetch<Profile>("/user/profile"),
 
-  putProfile: (body: { display_name: string; bio?: string }) =>
+  putProfile: (body: { bio: string }) =>
     apiFetch<Profile>("/user/profile", {
       method: "PUT",
       body: JSON.stringify(body),
@@ -148,6 +148,16 @@ export const api = {
       auth: memberAuth(sessionToken),
       body: JSON.stringify(body),
     }),
+
+  /** The org's audit log, newest first. Needs org:audit:read and the audit catalog. */
+  listOrgAuditEvents: (sessionToken: string, limit = 25, startingAfter?: string) => {
+    const q = new URLSearchParams({ limit: String(limit) })
+    if (startingAfter) q.set("starting_after", startingAfter)
+    return apiFetch<{ audit_events: AuditEvent[]; has_more: boolean }>(
+      `/org/audit-events?${q}`,
+      { auth: memberAuth(sessionToken) },
+    )
+  },
 
   listInvites: async (sessionToken: string) => {
     const data = await apiFetch<{ invites: Invite[]; has_more: boolean }>(

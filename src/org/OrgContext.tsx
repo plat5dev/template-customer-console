@@ -4,12 +4,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react"
 import { api } from "../api/endpoints"
 import type { MemberSession, OrganizationRef } from "../api/types"
 import { useAuth } from "../auth/AuthContext"
+import { cachedMemberSession, cacheMemberSession } from "../auth/session"
 
 const STORAGE_KEY = "plat5.web-demo.active-org"
 
@@ -43,6 +45,8 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   const [sessionError, setSessionError] = useState<unknown>(null)
   const [sessionForOrgId, setSessionForOrgId] = useState<string | null>(null)
   const [sessionEpoch, setSessionEpoch] = useState(0)
+  /** Set by refreshSession: the next mint skips the cache. */
+  const forceMint = useRef(false)
 
   const refresh = useCallback(async () => {
     if (!authenticated) {
@@ -92,9 +96,21 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     setSession(null)
     setSessionError(null)
     setSessionForOrgId(null)
+    // Reuse this tab's session for the org until it is about to expire. A mint is
+    // an audited write, so minting on every page load floods the org's log.
+    // refreshSession mints a fresh one: after a role change, say.
+    const force = forceMint.current
+    forceMint.current = false
+    const cached = force ? null : cachedMemberSession(orgId)
+    if (cached) {
+      setSession(cached)
+      setSessionForOrgId(orgId)
+      return
+    }
     void (async () => {
       try {
         const minted = await api.createMemberSession(orgId)
+        cacheMemberSession(minted)
         if (cancelled) return
         setSession(minted)
         setSessionError(null)
@@ -120,6 +136,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const refreshSession = useCallback(() => {
+    forceMint.current = true
     setSessionEpoch((n) => n + 1)
   }, [])
 

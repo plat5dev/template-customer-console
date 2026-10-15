@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { api } from "../api/endpoints"
 import { ApiError } from "../api/client"
 import { ErrorAlert } from "../components/ErrorAlert"
+import { HowItWorks } from "../components/HowItWorks"
 import { useOrg } from "../org/OrgContext"
 
 export function OrgsPage() {
@@ -42,13 +43,16 @@ export function OrgsPage() {
     <div className="row">
       <div className="col-lg-7">
         <h1 className="h3 mb-3">Organizations</h1>
-        <p className="text-muted small">
-          <code>GET /user/memberships</code> with the user JWT. Creating one is{" "}
-          <code>POST /user/organizations</code>. The active org mints a member
-          session (<code>POST /user/organizations/{"{id}"}/session</code>).
-          Organization and member calls send that token as <code>X-API-Key</code>,
-          not the user JWT. The gateway fills the subject into the path.
+        <p className="mb-2">
+          The organizations you belong to. Pick one to work in it.
         </p>
+        <HowItWorks>
+          <code>GET /user/memberships</code> with your sign-in; creating one is{" "}
+          <code>POST /user/organizations</code>. Picking one mints a member session (
+          <code>POST /user/organizations/{"{id}"}/session</code>), which this app keeps
+          until it expires. Organization and member calls send it as{" "}
+          <code>X-API-Key</code>, and the gateway writes the org into the path.
+        </HowItWorks>
         <ErrorAlert error={error} onDismiss={() => setError(null)} />
         <ErrorAlert error={loadError} />
         {sessionError != null && (

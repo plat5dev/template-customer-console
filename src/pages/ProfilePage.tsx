@@ -3,6 +3,7 @@ import { api } from "../api/endpoints"
 import { ApiError } from "../api/client"
 import type { AuditEvent, HandoffDetails, Profile, User } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
+import { HowItWorks } from "../components/HowItWorks"
 import { useAuth } from "../auth/AuthContext"
 import { idpSubject } from "../auth/session"
 
@@ -14,7 +15,6 @@ export function ProfilePage() {
   const [events, setEvents] = useState<AuditEvent[] | null>(null)
   const [handoff, setHandoff] = useState<HandoffDetails | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [displayName, setDisplayName] = useState("")
   const [bio, setBio] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -41,7 +41,6 @@ export function ProfilePage() {
         setUser(u)
         setName(u.display_name ?? "")
         setProfile(p)
-        setDisplayName(p.display_name)
         setBio(p.bio)
       } catch (e) {
         if (!cancelled) setError(e)
@@ -94,10 +93,7 @@ export function ProfilePage() {
     setError(null)
     setSaved(false)
     try {
-      const p = await api.putProfile({
-        display_name: displayName,
-        bio,
-      })
+      const p = await api.putProfile({ bio })
       setProfile(p)
       setSaved(true)
     } catch (err) {
@@ -118,11 +114,14 @@ export function ProfilePage() {
         <ErrorAlert error={error} onDismiss={() => setError(null)} />
 
         <h2 className="h5">Account</h2>
-        <p className="text-muted small">
-          Identity’s directory (<code>GET/PATCH/DELETE /user</code>) with the
-          user JWT. Your name shows on your members in every org that has not
-          set its own.
+        <p className="small mb-2">
+          Your name shows in every organization you're in, unless one sets its own.
         </p>
+        <HowItWorks>
+          Identity's directory (<code>GET/PATCH/DELETE /user</code>) with your sign-in. The
+          directory is private: organizations see your name and status, never your id or
+          email.
+        </HowItWorks>
         <form onSubmit={(e) => void onSaveName(e)} className="card card-body mb-4">
           <div className="mb-3">
             <label className="form-label text-muted small">IdP subject</label>
@@ -178,10 +177,13 @@ export function ProfilePage() {
         </form>
 
         <h2 className="h5">Your activity</h2>
-        <p className="text-muted small">
-          <code>GET /user/audit-events</code>: what you did with your account.
-          What you do inside an org is in that org’s log.
+        <p className="small mb-2">
+          What you did with your account. What you do inside an org is in that org's log.
         </p>
+        <HowItWorks>
+          <code>GET /user/audit-events</code>. The gateway records every write, with who,
+          from where, and how it ended. Services add what changed.
+        </HowItWorks>
         {events === null ? (
           <p className="small text-muted mb-4">
             Not available. Apply the audit catalog (<code>routes.audit.yml</code>).
@@ -209,10 +211,14 @@ export function ProfilePage() {
         )}
 
         <h2 className="h5">App profile</h2>
-        <p className="text-muted small">
-          The template service’s own data (<code>GET/PUT /user/profile</code>).
-          The gateway fills your directory id into the path.
+        <p className="small mb-2">
+          This app's own data about you. Your name is the one above, from your account.
         </p>
+        <HowItWorks>
+          <code>GET/PUT /user/profile</code> on your API. The gateway writes your directory
+          id into the path (<code>/users/{"{user_id}"}/profile</code>), so the API stores
+          the profile by it and never parses a token.
+        </HowItWorks>
         {saved && (
           <div className="alert alert-success py-2">Saved.</div>
         )}
@@ -223,19 +229,6 @@ export function ProfilePage() {
               <div className="font-monospace small">{profile.user_id}</div>
             </div>
           )}
-          <div className="mb-3">
-            <label className="form-label" htmlFor="display_name">
-              Display name
-            </label>
-            <input
-              id="display_name"
-              className="form-control"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              required
-              maxLength={255}
-            />
-          </div>
           <div className="mb-3">
             <label className="form-label" htmlFor="bio">
               Bio

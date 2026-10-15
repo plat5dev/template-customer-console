@@ -4,6 +4,7 @@ import { api } from "../api/endpoints"
 import type { ApiKeyCreated, ApiKeyListed } from "../api/types"
 import { ApiError } from "../api/client"
 import { ErrorAlert } from "../components/ErrorAlert"
+import { HowItWorks } from "../components/HowItWorks"
 import { useOrg } from "../org/OrgContext"
 
 type ProbeRow = {
@@ -149,16 +150,18 @@ export function ApiKeysPage() {
   return (
     <div>
       <h1 className="h3 mb-1">User API keys</h1>
-      <p className="text-muted small mb-3">
-        Person credentials (<code>GET/POST /user/api-keys</code>). Sent as{" "}
-        <code>X-API-Key</code> on user routes. They do not cover organization
-        or member routes. Member keys look the same and are minted for the
-        signed-in member on{" "}
-        <Link to={activeOrg ? `/orgs/${activeOrg.id}` : "/orgs"}>
-          org detail
-        </Link>
-        . Paste a key below to call a path with only <code>X-API-Key</code>.
+      <p className="mb-2">
+        Keys for scripts that act as you: your profile and your organizations list. To
+        work inside an org, use a member key from{" "}
+        <Link to={activeOrg ? `/orgs/${activeOrg.id}` : "/orgs"}>that org's page</Link>.
       </p>
+      <HowItWorks>
+        <code>GET/POST /user/api-keys</code> with your sign-in. A user key is sent as{" "}
+        <code>X-API-Key</code> and admitted on user routes (<code>/user/…</code>) only. On
+        an organization or member route it is <code>401</code>: those take a member key
+        or member session. Member keys look the same; the prefix says it's a key, not
+        whose.
+      </HowItWorks>
 
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
 
@@ -253,13 +256,17 @@ export function ApiKeysPage() {
         </div>
 
         <div className="col-lg-6 mb-4">
-          <h2 className="h5">Try with X-API-Key</h2>
-          <p className="small text-muted">
-            Calls the gateway with only <code>X-API-Key</code> (no user JWT).
-            User keys are admitted on user routes. Member keys and member
-            sessions are admitted on organization and member routes. A user JWT
-            on those routes is 401; this form does not send one.
+          <h2 className="h5">Which key works where</h2>
+          <p className="small mb-2">
+            Paste any key and call a path, or run the matrix to see each kind of key
+            against a user route and an org route.
           </p>
+          <HowItWorks>
+            Calls the gateway with only <code>X-API-Key</code>, no user JWT. User keys are
+            admitted on user routes; member keys and member sessions on organization and
+            member routes. The wrong kind is <code>401</code>, and the message says what
+            the route takes.
+          </HowItWorks>
           <form className="card card-body" onSubmit={(e) => void onTry(e)}>
             <div className="mb-3">
               <label className="form-label" htmlFor="try_key">
