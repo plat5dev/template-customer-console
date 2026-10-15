@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from "react"
 import { api } from "../api/endpoints"
 import type { ApiKeyCreated, ApiKeyListed } from "../api/types"
 import { ErrorAlert } from "./ErrorAlert"
+import { KeyRow } from "./KeyRow"
+import { Loading } from "./ui"
 
 type Props = {
   sessionToken: string
@@ -94,65 +96,40 @@ export function ServiceAccountKeys({
   }
 
   return (
-    <div className="w-100 border rounded p-3 bg-body-tertiary mt-2">
-      <div className="fw-semibold small mb-2">Keys</div>
-      <p className="small mb-2">
-        Keys for this service account. They carry its role, not yours.
-      </p>
+    <div className="inset">
+      <div className="spread">
+        <span className="label">Keys</span>
+        <span className="hint">They carry this service account's role, not yours.</span>
+      </div>
 
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
 
       {created && (
-        <div className="alert alert-warning py-2 small">
-          <div className="fw-semibold mb-1">Copy now — shown once</div>
-          <code className="user-select-all d-block text-break">
-            {created.key}
-          </code>
+        <div className="secret">
+          <strong>Copy now. It is shown once.</strong>
+          <code>{created.key}</code>
         </div>
       )}
 
-      {loading && <div className="text-muted small">Loading keys…</div>}
-      <div className="list-group list-group-flush mb-2">
-        {!loading && keys.length === 0 && (
-          <div className="list-group-item px-0 text-muted small">No keys.</div>
-        )}
-        {keys.map((k) => (
-          <div
-            key={k.id}
-            className="list-group-item px-0 d-flex justify-content-between align-items-start gap-2"
-          >
-            <div>
-              <div className="small fw-semibold">
-                {k.name}{" "}
-                {k.revoked_at && (
-                  <span className="badge text-bg-secondary">revoked</span>
-                )}
-              </div>
-              <div className="small font-monospace text-muted">
-                {k.key_prefix}… · {k.id}
-              </div>
-            </div>
-            {!k.revoked_at && (
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-danger"
-                onClick={() => void onRevoke(k.id)}
-              >
-                Revoke
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
+      {loading ? (
+        <Loading>Loading keys…</Loading>
+      ) : (
+        <div className="list flush">
+          {keys.length === 0 && <div className="empty" style={{ padding: 0 }}>No keys.</div>}
+          {keys.map((k) => (
+            <KeyRow key={k.id} k={k} onRevoke={() => void onRevoke(k.id)} />
+          ))}
+        </div>
+      )}
 
-      <form onSubmit={(e) => void onCreate(e)}>
-        <div className="mb-2">
-          <label className="form-label small mb-1" htmlFor={nameId}>
-            Name
+      <form className="form-row" onSubmit={(e) => void onCreate(e)}>
+        <div className="field">
+          <label htmlFor={nameId} className="small">
+            New key name
           </label>
           <input
             id={nameId}
-            className="form-control form-control-sm"
+            className="input input-sm"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -160,12 +137,8 @@ export function ServiceAccountKeys({
             placeholder="deploy-ci"
           />
         </div>
-        <button
-          type="submit"
-          className="btn btn-sm btn-primary"
-          disabled={creating || !name.trim()}
-        >
-          {creating ? "…" : "Create key"}
+        <button type="submit" className="btn btn-sm" disabled={creating || !name.trim()}>
+          {creating ? "Creating…" : "Create key"}
         </button>
       </form>
     </div>

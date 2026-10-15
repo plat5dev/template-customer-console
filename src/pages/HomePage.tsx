@@ -8,32 +8,35 @@ export function HomePage() {
   const { activeOrg } = useOrg()
 
   return (
-    <div className="row justify-content-center">
-      <div className="col-lg-8">
-        <div className="p-4 p-md-5 mb-4 bg-body-tertiary rounded-3">
-          <h1 className="display-6">{appName}</h1>
-          <p className="lead mb-3">
-            Sign in, pick an organization, and work on its projects with your team.
-          </p>
-          {!authenticated ? (
-            <button type="button" className="btn btn-primary btn-lg" onClick={() => void login("/")}>
-              Sign in
-            </button>
-          ) : (
-            <div className="d-flex flex-wrap gap-2">
-              <Link className="btn btn-primary" to="/projects" aria-disabled={!activeOrg}>
-                Projects
-              </Link>
-              <Link className="btn btn-outline-primary" to="/orgs">
-                Organizations
-              </Link>
-              <Link className="btn btn-outline-primary" to="/profile">
-                Profile
-              </Link>
-            </div>
-          )}
+    <section className="hero">
+      <p className="eyebrow">your app, on plat5</p>
+      <h1>{appName}</h1>
+      <p>Sign in, pick an organization, and work on its projects with your team.</p>
+      {!authenticated ? (
+        <div className="cluster">
+          <button type="button" className="btn btn-primary btn-lg" onClick={() => void login("/")}>
+            Sign in
+          </button>
+          <Link className="btn btn-lg btn-ghost" to="/learn">
+            How it works
+          </Link>
         </div>
-      </div>
-    </div>
+      ) : (
+        <div className="cluster">
+          {activeOrg ? (
+            <Link className="btn btn-primary btn-lg" to="/projects">
+              Open {activeOrg.name}
+            </Link>
+          ) : (
+            <Link className="btn btn-primary btn-lg" to="/orgs">
+              Pick an organization
+            </Link>
+          )}
+          <Link className="btn btn-lg" to="/profile">
+            Profile
+          </Link>
+        </div>
+      )}
+    </section>
   )
 }

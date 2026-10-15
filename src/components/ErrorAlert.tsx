@@ -39,27 +39,16 @@ export function ErrorAlert({
   }
 
   return (
-    <div className="alert alert-danger alert-dismissible" role="alert">
-      <strong className="me-2">{title}</strong>
-      {message}
-      {meta && (
-        <div className="small text-danger-emphasis mt-1 font-monospace">{meta}</div>
-      )}
-      {envelope && (
-        <pre
-          className="small mt-2 mb-0 p-2 bg-body-secondary rounded font-monospace overflow-auto"
-          style={{ maxHeight: "12rem" }}
-        >
-          {envelope}
-        </pre>
-      )}
+    <div className={`alert alert-error${onDismiss ? " has-close" : ""}`} role="alert">
+      <div>
+        <span className="alert-title">{title}</span> {message}
+      </div>
+      {meta && <div className="alert-meta">{meta}</div>}
+      {envelope && <pre>{envelope}</pre>}
       {onDismiss && (
-        <button
-          type="button"
-          className="btn-close"
-          aria-label="Close"
-          onClick={onDismiss}
-        />
+        <button type="button" className="alert-close" aria-label="Close" onClick={onDismiss}>
+          ×
+        </button>
       )}
     </div>
   )

@@ -1,9 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react"
 import { Link } from "react-router-dom"
 import { api } from "../api/endpoints"
-import { ApiError } from "../api/client"
 import type { MemberSession, Project } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
+import { NoOrg } from "../components/NoOrg"
+import { SessionError } from "../components/SessionError"
+import { Loading, PageHead } from "../components/ui"
 import { useOrg } from "../org/OrgContext"
 
 export function ProjectsPage() {
@@ -15,38 +17,13 @@ export function ProjectsPage() {
     refreshSession,
   } = useOrg()
 
-  if (!activeOrg) {
-    return (
-      <div className="alert alert-warning">
-        Select or create an organization first.{" "}
-        <Link to="/orgs">Organizations</Link>
-      </div>
-    )
-  }
-
+  if (!activeOrg) return <NoOrg />
   if (sessionError) {
     return (
-      <>
-        <ErrorAlert error={sessionError} />
-        <p className="small text-muted">
-          {sessionError instanceof ApiError && sessionError.status === 404
-            ? "Not an active member. Organization and member routes are not called with the user JWT."
-            : "Projects use a member session, not the user JWT."}
-        </p>
-        <button
-          type="button"
-          className="btn btn-sm btn-outline-secondary"
-          onClick={refreshSession}
-        >
-          Retry session
-        </button>
-      </>
+      <SessionError error={sessionError} onRetry={refreshSession} hint="Projects use a member session, not the user JWT." />
     )
   }
-
-  if (sessionLoading || !session) {
-    return <div className="text-muted">Opening member session…</div>
-  }
+  if (sessionLoading || !session) return <Loading>Opening member session…</Loading>
 
   return <ProjectsLoaded key={session.token} session={session} orgName={activeOrg.name} />
 }
@@ -131,97 +108,81 @@ function ProjectsLoaded({
   }
 
   return (
-    <div>
-      <div className="d-flex justify-content-between align-items-start mb-3">
-        <div>
-          <h1 className="h3 mb-1">Projects</h1>
-          <p className="small mb-0">
-            Projects in <strong>{orgName}</strong>.
-          </p>
-        </div>
-      </div>
+    <>
+      <PageHead
+        eyebrow={
+          <>
+            /organizations/<span className="filled">{session.organization_id}</span>/projects
+          </>
+        }
+        title="Projects"
+        lede={
+          <>
+            Projects in <strong>{orgName}</strong>. Your API stores them; the gateway fills in the org.
+          </>
+        }
+      />
 
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
 
-      <div className="row">
-        <div className="col-lg-7 mb-4">
-          {loading && <div className="text-muted">Loading…</div>}
-          <div className="list-group">
-            {!loading && projects.length === 0 && (
-              <div className="list-group-item text-muted">No projects yet.</div>
-            )}
-            {projects.map((p) => (
-              <div
-                key={p.id}
-                className="list-group-item d-flex justify-content-between align-items-start"
-              >
-                <div>
-                  <Link
-                    className="fw-semibold text-decoration-none"
-                    to={`/projects/${p.id}`}
-                  >
-                    {p.name}
-                  </Link>
-                  {p.description && (
-                    <div className="small text-muted">{p.description}</div>
-                  )}
-                  <div className="small font-monospace text-muted">{p.id}</div>
+      <div className="split">
+        <section className="stack-sm">
+          {loading ? (
+            <Loading />
+          ) : (
+            <div className="list">
+              {projects.length === 0 && <div className="empty">No projects yet. Create the first one.</div>}
+              {projects.map((p) => (
+                <div key={p.id} className="list-item">
+                  <div>
+                    <Link className="list-title" to={`/projects/${p.id}`}>
+                      {p.name}
+                    </Link>
+                    {p.description && <div className="small text-2">{p.description}</div>}
+                    <div className="list-meta mono">{p.id}</div>
+                  </div>
+                  <button type="button" className="btn btn-sm btn-danger" onClick={() => void onDelete(p.id)}>
+                    Delete
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-danger"
-                  onClick={() => void onDelete(p.id)}
-                >
-                  Delete
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="col-lg-5">
-          <div className="card">
-            <div className="card-header">New project</div>
-            <div className="card-body">
-              <form onSubmit={(e) => void onCreate(e)}>
-                <div className="mb-3">
-                  <label className="form-label" htmlFor="proj_name">
-                    Name
-                  </label>
-                  <input
-                    id="proj_name"
-                    className="form-control"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    maxLength={255}
-                  />
-                </div>
-                <div className="mb-3">
-                  <label className="form-label" htmlFor="proj_desc">
-                    Description
-                  </label>
-                  <textarea
-                    id="proj_desc"
-                    className="form-control"
-                    rows={2}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    maxLength={2000}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={creating || !name.trim()}
-                >
-                  {creating ? "Creating…" : "Create"}
-                </button>
-              </form>
+              ))}
             </div>
+          )}
+        </section>
+
+        <form className="card" onSubmit={(e) => void onCreate(e)}>
+          <div className="card-head">
+            <h2>New project</h2>
           </div>
-        </div>
+          <div className="card-body">
+            <div className="field">
+              <label htmlFor="proj_name">Name</label>
+              <input
+                id="proj_name"
+                className="input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                maxLength={255}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="proj_desc">Description</label>
+              <textarea
+                id="proj_desc"
+                className="textarea"
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                maxLength={2000}
+              />
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={creating || !name.trim()}>
+              {creating ? "Creating…" : "Create project"}
+            </button>
+          </div>
+        </form>
       </div>
-    </div>
+    </>
   )
 }

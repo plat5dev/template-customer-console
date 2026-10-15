@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Link } from "react-router-dom"
 import { api } from "../api/endpoints"
 import { holds } from "../api/roles"
 import type { AuditEvent, Member } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
+import { NoOrg } from "../components/NoOrg"
+import { Loading, PageHead } from "../components/ui"
 import { useOrg } from "../org/OrgContext"
 
 const PAGE = 25
@@ -50,48 +51,44 @@ export function AuditLogPage() {
     [members],
   )
 
-  if (!activeOrg) {
-    return (
-      <div className="alert alert-warning">
-        Select or create an organization first. <Link to="/orgs">Organizations</Link>
-      </div>
-    )
-  }
+  if (!activeOrg) return <NoOrg />
   if (sessionError) return <ErrorAlert error={sessionError} />
-  if (sessionLoading || !session) return <div className="text-muted">Loading…</div>
+  if (sessionLoading || !session) return <Loading>Opening member session…</Loading>
 
   return (
-    <div>
-      <h1 className="h3 mb-1">Audit log</h1>
-      <p className="mb-2">
-        Every change in <strong>{activeOrg.name}</strong>: who made it, how it ended, and
-        what changed.
-      </p>
+    <>
+      <PageHead
+        eyebrow="/org/audit-events"
+        title="Audit log"
+        lede={
+          <>
+            Every change in <strong>{activeOrg.name}</strong>: who made it, how it ended, and what changed.
+          </>
+        }
+      />
 
       {!allowed ? (
-        <p className="text-muted">
+        <div className="alert alert-warn">
           Your role can't read the audit log (needs <code>org:audit:read</code>).
-        </p>
+        </div>
       ) : (
         <>
           <ErrorAlert error={error} onDismiss={() => setError(null)} />
-          <div className="list-group mb-3">
-            {!loading && events.length === 0 && (
-              <div className="list-group-item text-muted">No events yet.</div>
-            )}
+          <div className="list">
+            {!loading && events.length === 0 && <div className="empty">No events yet.</div>}
             {events.map((e) => (
-              <div key={e.id} className="list-group-item">
-                <div className="d-flex flex-wrap justify-content-between gap-2">
-                  <span>
-                    <strong>{e.actor.member_id === session.member_id ? "You" : actorName(e, names)}</strong>{" "}
-                    <span className="font-monospace small">
+              <div key={e.id} className="list-item stacked">
+                <div className="spread">
+                  <span className="cluster">
+                    <strong>{e.actor.member_id === session.member_id ? "You" : actorName(e, names)}</strong>
+                    <code className="small">
                       {e.method} {e.route}
-                    </span>
+                    </code>
                   </span>
                   <span className={`badge ${outcomeClass(e)}`}>{outcomeText(e)}</span>
                 </div>
                 {e.details && Object.keys(e.details).length > 0 && (
-                  <ul className="small mb-1 mt-1">
+                  <ul className="small text-2">
                     {Object.entries(e.details).map(([field, change]) => (
                       <li key={field}>
                         <code>{field}</code> {describeChange(change)}
@@ -99,9 +96,8 @@ export function AuditLogPage() {
                     ))}
                   </ul>
                 )}
-                <div className="small text-muted">
-                  {new Date(e.occurred_at).toLocaleString()} · {e.service} ·{" "}
-                  {e.actor.auth_type.replace("_", " ")}
+                <div className="list-meta">
+                  {new Date(e.occurred_at).toLocaleString()} · {e.service} · {e.actor.auth_type.replace("_", " ")}
                   {e.created_id && (
                     <>
                       {" "}
@@ -113,18 +109,20 @@ export function AuditLogPage() {
             ))}
           </div>
           {hasMore && (
-            <button
-              type="button"
-              className="btn btn-outline-secondary btn-sm"
-              disabled={loading}
-              onClick={() => void load(events[events.length - 1]?.id)}
-            >
-              {loading ? "Loading…" : "Older events"}
-            </button>
+            <div>
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={loading}
+                onClick={() => void load(events[events.length - 1]?.id)}
+              >
+                {loading ? "Loading…" : "Older events"}
+              </button>
+            </div>
           )}
         </>
       )}
-    </div>
+    </>
   )
 }
 
@@ -147,10 +145,11 @@ function outcomeText(e: AuditEvent): string {
   }
 }
 
+/** Pending is unknown, never success: dashed. A refusal or an error: red. */
 function outcomeClass(e: AuditEvent): string {
-  if (e.outcome === "responded" && e.status != null && e.status < 400) return "text-bg-success"
-  if (e.outcome === "pending" || e.outcome === "no_response") return "text-bg-warning"
-  return "text-bg-danger"
+  if (e.outcome === "responded" && e.status != null && e.status < 400) return ""
+  if (e.outcome === "pending" || e.outcome === "no_response") return "badge-dashed"
+  return "badge-danger"
 }
 
 /** A `{ from, to }` change as "from → to"; anything else as JSON. */

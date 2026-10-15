@@ -43,7 +43,7 @@ export default function App() {
                 }
               />
               <Route
-                path="orgs/:orgId"
+                path="orgs/:orgId/:section?"
                 element={
                   <RequireAuth>
                     <OrgDetailPage />

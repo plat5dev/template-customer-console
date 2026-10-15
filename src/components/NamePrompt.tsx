@@ -54,13 +54,14 @@ export function NamePrompt() {
   }
 
   return (
-    <form className="alert alert-info d-flex flex-wrap align-items-center gap-2" onSubmit={(e) => void onSave(e)}>
-      <label htmlFor="first_name" className="mb-0">
+    <form className="alert alert-info" onSubmit={(e) => void onSave(e)}>
+      <label htmlFor="first_name" className="label">
         What should people in your organizations call you?
       </label>
+      <div className="cluster">
       <input
         id="first_name"
-        className="form-control form-control-sm"
+        className="input input-sm"
         style={{ maxWidth: "16rem" }}
         value={name}
         onChange={(e) => setName(e.target.value)}
@@ -71,9 +72,10 @@ export function NamePrompt() {
       <button type="submit" className="btn btn-sm btn-primary" disabled={saving || !name.trim()}>
         Save
       </button>
-      <button type="button" className="btn btn-sm btn-link" onClick={onDismiss}>
+      <button type="button" className="btn btn-sm btn-ghost" onClick={onDismiss}>
         Not now
       </button>
+      </div>
     </form>
   )
 }

@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react"
-import { Link, useNavigate, useParams } from "react-router-dom"
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom"
 import { api } from "../api/endpoints"
-import { ApiError } from "../api/client"
 import type {
   Member,
   MemberPatchStatus,
@@ -16,13 +15,26 @@ import { InvitePanel } from "../components/InvitePanel"
 import { MemberKeysPanel } from "../components/MemberKeysPanel"
 import { RoleSelect } from "../components/RoleSelect"
 import { ServiceAccountKeys } from "../components/ServiceAccountKeys"
+import { SessionError } from "../components/SessionError"
+import { initials } from "../components/initials"
+import { Loading, PageHead, Status } from "../components/ui"
 import { useOrg } from "../org/OrgContext"
 import { config } from "../config"
 
 const SELF_STATUSES: MemberPatchStatus[] = ["active", "suspended"]
 
+const SECTIONS = {
+  members: "Members",
+  "service-accounts": "Service accounts",
+  invites: "Invites",
+  settings: "Settings",
+} as const
+
+type Section = keyof typeof SECTIONS
+
+/** An org's pages: members, service accounts, invites, and settings, one per sidebar link. */
 export function OrgDetailPage() {
-  const { orgId = "" } = useParams()
+  const { orgId = "", section = "members" } = useParams()
   const {
     activeOrgId,
     setActiveOrgId,
@@ -36,46 +48,27 @@ export function OrgDetailPage() {
     if (orgId && orgId !== activeOrgId) setActiveOrgId(orgId)
   }, [orgId, activeOrgId, setActiveOrgId])
 
-  if (!orgId) {
-    return <Link to="/orgs">← Organizations</Link>
-  }
+  if (!orgId) return <Navigate to="/orgs" replace />
+  if (!(section in SECTIONS)) return <Navigate to={`/orgs/${orgId}/members`} replace />
 
   if (sessionError && activeOrgId === orgId) {
     return (
-      <>
-        <ErrorAlert error={sessionError} />
-        <p className="small text-muted">
-          {sessionError instanceof ApiError && sessionError.status === 404
-            ? "Not an active member. Organization routes are not called with the user JWT."
-            : "Organization and member routes use a member session, not the user JWT."}
-        </p>
-        <div className="d-flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="btn btn-sm btn-outline-secondary"
-            onClick={refreshSession}
-          >
-            Retry session
-          </button>
-          <Link to="/orgs">← Organizations</Link>
-        </div>
-      </>
+      <SessionError
+        error={sessionError}
+        onRetry={refreshSession}
+        hint="Organization and member routes use a member session, not the user JWT."
+      />
     )
   }
 
-  if (
-    sessionLoading ||
-    activeOrgId !== orgId ||
-    !session ||
-    session.organization_id !== orgId
-  ) {
-    return <div className="text-muted">Opening member session…</div>
+  if (sessionLoading || activeOrgId !== orgId || !session || session.organization_id !== orgId) {
+    return <Loading>Opening member session…</Loading>
   }
 
-  return <OrgDetailLoaded key={session.token} session={session} />
+  return <OrgDetailLoaded key={session.token} session={session} section={section as Section} />
 }
 
-function OrgDetailLoaded({ session }: { session: MemberSession }) {
+function OrgDetailLoaded({ session, section }: { session: MemberSession; section: Section }) {
   const navigate = useNavigate()
   const { refresh: refreshOrgs, setActiveOrgId, activeOrg } = useOrg()
 
@@ -323,381 +316,172 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
     return m.display_name ?? m.id
   }
 
-  if (loading) {
-    return <div className="text-muted">Loading…</div>
-  }
+  if (loading) return <Loading />
 
   if (!org) {
     return (
-      <>
+      <div className="stack narrow">
         <ErrorAlert error={error} />
-        <Link to="/orgs">← Organizations</Link>
-      </>
+        <Link to="/orgs">Organizations</Link>
+      </div>
     )
   }
 
+  const me = members.find((m) => m.id === session.member_id)
+  const roleLine = roleList.length > 0 && (
+    <span className="small muted">
+      You are <strong className="text-2">{session.role ?? "no role"}</strong> · {labelsSummary(session.labels)}
+    </span>
+  )
+
   return (
-    <div>
-      <nav aria-label="breadcrumb">
-        <ol className="breadcrumb">
-          <li className="breadcrumb-item">
-            <Link to="/orgs">Organizations</Link>
-          </li>
-          <li className="breadcrumb-item active" aria-current="page">
-            {org.name}
-          </li>
-        </ol>
-      </nav>
-
-      <div className="d-flex flex-wrap gap-2 justify-content-between align-items-start mb-3">
-        <div>
-          <h1 className="h3 mb-1">{org.name}</h1>
-          <p className="small font-monospace text-muted mb-0">{org.id}</p>
-          <p className="small font-monospace text-muted mb-0">
-            member {session.member_id}
-          </p>
-          {roleList.length > 0 && (
-            <p className="small text-muted mb-0">
-              role <strong>{session.role ?? "none"}</strong> · labels{" "}
-              <span className="font-monospace">{labelsSummary(session.labels)}</span>
-            </p>
-          )}
-        </div>
-        <div className="d-flex gap-2">
-          <button
-            type="button"
-            className="btn btn-sm btn-outline-primary"
-            onClick={() => setActiveOrgId(org.id)}
-          >
-            Set active
-          </button>
-          <Link className="btn btn-sm btn-outline-secondary" to="/projects">
-            Projects
-          </Link>
-        </div>
-      </div>
-
+    <>
+      <PageHead
+        eyebrow={
+          <>
+            /organizations/<span className="filled">{org.id}</span>
+            {section === "settings" ? "" : `/${section}`}
+          </>
+        }
+        title={SECTIONS[section]}
+        lede={
+          <>
+            In <strong>{org.name}</strong>. {roleLine}
+          </>
+        }
+      />
 
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
-      {saved && <div className="alert alert-success py-2">Saved.</div>}
 
-      <div className="row">
-        <div className="col-lg-5 mb-4">
-          <div className="card mb-3">
-            <div className="card-header">Edit organization</div>
-            <div className="card-body">
-              <form onSubmit={(e) => void onSave(e)}>
-                <div className="mb-3">
-                  <label className="form-label" htmlFor="org_name">
-                    Name
-                  </label>
-                  <input
-                    id="org_name"
-                    className="form-control"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    maxLength={128}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={saving || !can("org:write")}
-                  title={can("org:write") ? undefined : "Needs org:write"}
-                >
-                  {saving ? "Saving…" : "Save"}
-                </button>
-              </form>
-            </div>
-          </div>
-
-          <div className="card mb-3">
-            <div className="card-header">Service accounts</div>
-            <div className="card-body">
-              <p className="small mb-2">
-                Members for machines: CI, a backend job, an integration. They have a role
-                and keys, and belong to this org.
-              </p>
-              <div className="list-group mb-3">
-                {serviceAccounts.length === 0 && (
-                  <div className="list-group-item text-muted">None yet.</div>
-                )}
-                {serviceAccounts.map((sa) => (
-                  <div key={sa.id} className="list-group-item">
-                    <div className="d-flex flex-wrap gap-2 justify-content-between align-items-start">
-                      <div>
-                        <div className="fw-semibold">
-                          {sa.name}{" "}
-                          {sa.role && (
-                            <span className="badge text-bg-light border">
-                              {sa.role}
+      {section === "members" && (
+        <div className="split">
+          <section className="stack-sm">
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>member</th>
+                    {roleList.length > 0 && <th>role</th>}
+                    <th>status</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {members.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="muted">
+                        No members.
+                      </td>
+                    </tr>
+                  )}
+                  {members.map((m) => {
+                    const isMe = m.id === session.member_id
+                    const bot = m.principal === "service_account"
+                    const busy = memberSaving === m.id || !can("org:members:write")
+                    return (
+                      <tr key={m.id}>
+                        <td>
+                          <span className="who">
+                            <span className={`avatar${bot ? " square" : ""}`}>
+                              {bot ? "SA" : initials(memberLabel(m))}
                             </span>
-                          )}{" "}
-                          {sa.status === "suspended" && (
-                            <span className="badge text-bg-secondary">
-                              suspended
+                            <span>
+                              {memberLabel(m)}
+                              <span className="sub mono">
+                                {isMe ? "you · " : bot ? "service account · " : ""}
+                                {m.id}
+                              </span>
+                            </span>
+                          </span>
+                        </td>
+                        {roleList.length > 0 && (
+                          <td>
+                            {isMe ? (
+                              <span className="badge">{m.role}</span>
+                            ) : (
+                              <RoleSelect
+                                roles={roleList}
+                                ariaLabel={`Role of ${memberLabel(m)}`}
+                                value={m.role ?? ""}
+                                disabled={busy}
+                                onChange={(role) => void onChangeMember(m, { role })}
+                              />
+                            )}
+                          </td>
+                        )}
+                        <td>
+                          <Status value={m.status} />
+                        </td>
+                        <td className="actions">
+                          {isMe ? (
+                            <Link className="btn btn-sm btn-ghost" to={`/orgs/${org.id}/settings`}>
+                              Your membership
+                            </Link>
+                          ) : (
+                            <span className="cluster" style={{ justifyContent: "flex-end" }}>
+                              {m.status === "active" && (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm"
+                                  disabled={busy}
+                                  onClick={() => void onChangeMember(m, { status: "suspended" })}
+                                >
+                                  Suspend
+                                </button>
+                              )}
+                              {m.status === "suspended" && (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm"
+                                  disabled={busy}
+                                  onClick={() => void onChangeMember(m, { status: "active" })}
+                                >
+                                  Reactivate
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-ghost"
+                                disabled={busy}
+                                onClick={() => void onRemoveMember(m)}
+                              >
+                                Remove
+                              </button>
                             </span>
                           )}
-                        </div>
-                        <div className="small font-monospace text-muted">
-                          sa {sa.id}
-                        </div>
-                        <div className="small font-monospace text-muted">
-                          member {sa.member_id}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-danger"
-                        onClick={() => void onDeleteSa(sa)}
-                        disabled={!can("org:service-accounts:write")}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                    <ServiceAccountKeys
-                      sessionToken={session.token}
-                      serviceAccountId={sa.id}
-                    />
-                  </div>
-                ))}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="small muted">
+              To invite people by link, use <Link to={`/orgs/${org.id}/invites`}>Invites</Link>.
+            </p>
+          </section>
+
+          <div className="stack">
+            <form className="card" onSubmit={(e) => void onAddMember(e)}>
+              <div className="card-head">
+                <h2>Add a person</h2>
               </div>
-              <form
-                className="row g-2 align-items-end"
-                onSubmit={(e) => void onCreateSa(e)}
-              >
-                {roleList.length > 0 && (
-                  <div className="col-auto">
-                    <label className="form-label" htmlFor="sa_role">
-                      Role
-                    </label>
-                    <RoleSelect
-                      id="sa_role"
-                      roles={roleList}
-                      value={saRole}
-                      onChange={setSaRole}
-                      empty={defaultOption(roles?.service_account_default_role)}
-                    />
-                  </div>
-                )}
-                <div className="col">
-                  <label className="form-label" htmlFor="sa_name">
-                    Name
-                  </label>
-                  <input
-                    id="sa_name"
-                    className="form-control"
-                    value={saName}
-                    onChange={(e) => setSaName(e.target.value)}
-                    required
-                    maxLength={128}
-                    placeholder="deploy-bot"
-                  />
-                </div>
-                <div className="col-auto">
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={
-                      creatingSa ||
-                      !saName.trim() ||
-                      !can("org:service-accounts:write")
-                    }
-                  >
-                    {creatingSa ? "…" : "Create"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-
-          <div className="card border-danger">
-            <div className="card-header text-danger">Danger zone</div>
-            <div className="card-body">
-              <p className="small text-muted mb-2">
-                Deletes the organization and its members, invites, service
-                accounts, and keys.
-              </p>
-              <button
-                type="button"
-                className="btn btn-outline-danger btn-sm"
-                onClick={() => void onDeleteOrg()}
-                disabled={!can("org:delete")}
-                title={can("org:delete") ? undefined : "Needs org:delete"}
-              >
-                Delete organization
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-lg-7 mb-4">
-          <h2 className="h5">Members</h2>
-          <p className="small mb-2">
-            Who is in this org, and their role. Invite people below.
-          </p>
-
-          <div className="list-group mb-3">
-            {members.length === 0 && (
-              <div className="list-group-item text-muted">No members.</div>
-            )}
-            {members.map((m) => {
-              const isMe = m.id === session.member_id
-              return (
-                <div
-                  key={m.id}
-                  className="list-group-item d-flex flex-wrap gap-2 justify-content-between align-items-center"
-                >
-                  <div>
-                    <div className="d-flex flex-wrap align-items-center gap-2">
-                      <span className="font-monospace small">
-                        {memberLabel(m)}
-                      </span>
-                      <span
-                        className={`badge ${
-                          m.principal === "service_account"
-                            ? "text-bg-info"
-                            : "text-bg-light border"
-                        }`}
-                      >
-                        {m.principal}
-                      </span>
-                      {roleList.length > 0 && (
-                        <span className="badge text-bg-light border">
-                          {m.role}
-                        </span>
-                      )}
-                      {isMe && (
-                        <span className="badge text-bg-primary">you</span>
-                      )}
-                    </div>
-                    <div className="small text-muted">
-                      {m.status} · member {m.id}
-                    </div>
-                  </div>
-                  {isMe && (
-                    <div className="d-flex gap-2 align-items-center">
-                      <select
-                        className="form-select form-select-sm"
-                        style={{ width: "auto" }}
-                        aria-label="Your membership status"
-                        value={
-                          m.status === "active" || m.status === "suspended"
-                            ? m.status
-                            : "active"
-                        }
-                        disabled={statusSaving}
-                        onChange={(e) =>
-                          void onSelfStatus(e.target.value as MemberPatchStatus)
-                        }
-                      >
-                        {SELF_STATUSES.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-danger"
-                        onClick={() => void onLeave()}
-                      >
-                        Leave
-                      </button>
-                    </div>
-                  )}
-                  {!isMe && (
-                    <div className="d-flex gap-2 align-items-center">
-                      <RoleSelect
-                        roles={roleList}
-                        ariaLabel={`Role of ${memberLabel(m)}`}
-                        value={m.role ?? ""}
-                        disabled={
-                          memberSaving === m.id || !can("org:members:write")
-                        }
-                        onChange={(role) => void onChangeMember(m, { role })}
-                      />
-                      <select
-                        className="form-select form-select-sm"
-                        style={{ width: "auto" }}
-                        aria-label={`Status of ${memberLabel(m)}`}
-                        value={
-                          m.status === "active" || m.status === "suspended"
-                            ? m.status
-                            : "active"
-                        }
-                        disabled={
-                          memberSaving === m.id || !can("org:members:write")
-                        }
-                        onChange={(e) =>
-                          void onChangeMember(m, {
-                            status: e.target.value as MemberPatchStatus,
-                          })
-                        }
-                      >
-                        {SELF_STATUSES.map((st) => (
-                          <option key={st} value={st}>
-                            {st}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-danger"
-                        disabled={
-                          memberSaving === m.id || !can("org:members:write")
-                        }
-                        onClick={() => void onRemoveMember(m)}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="mb-4">
-            <MemberKeysPanel
-              sessionToken={session.token}
-            />
-          </div>
-
-          <InvitePanel
-            sessionToken={session.token}
-            onError={setError}
-            roles={roleList}
-            defaultRole={roles?.default_role ?? null}
-            canManage={can("org:members:write")}
-          />
-
-          <div className="card mb-4">
-            <div className="card-header">Add user member</div>
-            <div className="card-body">
-              <form
-                className="row g-2 align-items-end"
-                onSubmit={(e) => void onAddMember(e)}
-              >
-                <div className="col">
-                  <label className="form-label" htmlFor="member_subject">
-                    IdP subject
-                  </label>
+              <div className="card-body">
+                <div className="field">
+                  <label htmlFor="member_subject">IdP subject</label>
                   <input
                     id="member_subject"
-                    className="form-control font-monospace"
+                    className="input mono"
                     value={memberSubject}
                     onChange={(e) => setMemberSubject(e.target.value)}
                     required
-                    placeholder="subject from their Profile"
+                    placeholder="from their Profile page"
                   />
+                  <span className="hint">They become an active member right away.</span>
                 </div>
                 {roleList.length > 0 && (
-                  <div className="col-auto">
-                    <label className="form-label" htmlFor="member_role">
-                      Role
-                    </label>
+                  <div className="field">
+                    <label htmlFor="member_role">Role</label>
                     <RoleSelect
                       id="member_role"
                       roles={roleList}
@@ -707,23 +491,219 @@ function OrgDetailLoaded({ session }: { session: MemberSession }) {
                     />
                   </div>
                 )}
-                <div className="col-auto">
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={
-                      adding || !memberSubject.trim() || !can("org:members:write")
-                    }
-                  >
-                    {adding ? "…" : "Add"}
-                  </button>
-                </div>
-              </form>
-            </div>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={adding || !memberSubject.trim() || !can("org:members:write")}
+                >
+                  {adding ? "Adding…" : "Add member"}
+                </button>
+              </div>
+            </form>
+            <MemberKeysPanel sessionToken={session.token} />
           </div>
-
         </div>
-      </div>
-    </div>
+      )}
+
+      {section === "service-accounts" && (
+        <div className="split">
+          <section className="stack-sm">
+            <p className="section-lede">
+              Members for machines: CI, a backend job, an integration. They have a role and keys, and belong to
+              this org.
+            </p>
+            <div className="list">
+              {serviceAccounts.length === 0 && <div className="empty">No service accounts yet.</div>}
+              {serviceAccounts.map((sa) => (
+                <div key={sa.id} className="list-item stacked">
+                  <div className="spread">
+                    <span className="who">
+                      <span className="avatar square">SA</span>
+                      <span>
+                        <span className="cluster">
+                          <span className="list-title">{sa.name}</span>
+                          {sa.role && <span className="badge">{sa.role}</span>}
+                          {sa.status !== "active" && <Status value={sa.status} />}
+                        </span>
+                        <span className="sub mono">
+                          {sa.id} · member {sa.member_id}
+                        </span>
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-danger"
+                      onClick={() => void onDeleteSa(sa)}
+                      disabled={!can("org:service-accounts:write")}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                  <ServiceAccountKeys sessionToken={session.token} serviceAccountId={sa.id} />
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <form className="card" onSubmit={(e) => void onCreateSa(e)}>
+            <div className="card-head">
+              <h2>New service account</h2>
+            </div>
+            <div className="card-body">
+              <div className="field">
+                <label htmlFor="sa_name">Name</label>
+                <input
+                  id="sa_name"
+                  className="input"
+                  value={saName}
+                  onChange={(e) => setSaName(e.target.value)}
+                  required
+                  maxLength={128}
+                  placeholder="deploy-bot"
+                />
+              </div>
+              {roleList.length > 0 && (
+                <div className="field">
+                  <label htmlFor="sa_role">Role</label>
+                  <RoleSelect
+                    id="sa_role"
+                    roles={roleList}
+                    value={saRole}
+                    onChange={setSaRole}
+                    empty={defaultOption(roles?.service_account_default_role)}
+                  />
+                  <span className="hint">Its own role, not bounded by yours.</span>
+                </div>
+              )}
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={creatingSa || !saName.trim() || !can("org:service-accounts:write")}
+              >
+                {creatingSa ? "Creating…" : "Create service account"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {section === "invites" && (
+        <InvitePanel
+          sessionToken={session.token}
+          onError={setError}
+          roles={roleList}
+          defaultRole={roles?.default_role ?? null}
+          canManage={can("org:members:write")}
+        />
+      )}
+
+      {section === "settings" && (
+        <div className="stack narrow">
+          {saved && <div className="alert alert-ok">Saved.</div>}
+          <form className="card" onSubmit={(e) => void onSave(e)}>
+            <div className="card-head">
+              <h2>Organization</h2>
+            </div>
+            <div className="card-body">
+              <div className="field">
+                <label htmlFor="org_name">Name</label>
+                <input
+                  id="org_name"
+                  className="input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  maxLength={128}
+                />
+              </div>
+              <div className="field">
+                <span className="label">Id</span>
+                <code className="select-all">{org.id}</code>
+                <span className="hint">The id is the address. The name is only a label.</span>
+              </div>
+            </div>
+            <div className="card-foot">
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={saving || !can("org:write")}
+                title={can("org:write") ? undefined : "Needs org:write"}
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </form>
+
+          <section className="card">
+            <div className="card-head">
+              <h2>Your membership</h2>
+              {me && <Status value={me.status} />}
+            </div>
+            <div className="card-body">
+              <dl className="fields">
+                <dt>Member id</dt>
+                <dd>
+                  <code>{session.member_id}</code>
+                </dd>
+                {roleList.length > 0 && (
+                  <>
+                    <dt>Role</dt>
+                    <dd>{session.role ?? "none"}</dd>
+                    <dt>Labels</dt>
+                    <dd className="mono small">{labelsSummary(session.labels)}</dd>
+                  </>
+                )}
+              </dl>
+              <p className="section-lede">
+                Suspending yourself ends your member session: organization routes stop admitting you.
+              </p>
+            </div>
+            <div className="card-foot">
+              {me && (
+                <select
+                  className="select auto"
+                  aria-label="Your membership status"
+                  value={me.status === "active" || me.status === "suspended" ? me.status : "active"}
+                  disabled={statusSaving}
+                  onChange={(e) => void onSelfStatus(e.target.value as MemberPatchStatus)}
+                >
+                  {SELF_STATUSES.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button type="button" className="btn btn-danger end" onClick={() => void onLeave()}>
+                Leave organization
+              </button>
+            </div>
+          </section>
+
+          <section className="card danger">
+            <div className="card-head">
+              <h2>Delete organization</h2>
+            </div>
+            <div className="card-body">
+              <p className="section-lede">
+                Deletes the organization and its members, invites, service accounts, and keys. This cannot be
+                undone.
+              </p>
+            </div>
+            <div className="card-foot">
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => void onDeleteOrg()}
+                disabled={!can("org:delete")}
+                title={can("org:delete") ? undefined : "Needs org:delete"}
+              >
+                Delete {org.name}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+    </>
   )
 }

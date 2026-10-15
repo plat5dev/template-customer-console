@@ -42,24 +42,24 @@ export function CallbackPage() {
 
   if (error) {
     return (
-      <div className="row justify-content-center">
-        <div className="col-md-8">
-          <h1 className="h4 mb-3">Sign-in failed</h1>
-          <ErrorAlert error={error} />
-          <div className="d-flex flex-wrap gap-2">
-            <a className="btn btn-outline-secondary" href="/login">
-              Try again
-            </a>
-            <a className="btn btn-outline-primary" href="/orgs">
-              Organizations
-            </a>
+      <div className="center">
+        <div className="card">
+          <div className="card-body">
+            <h1 className="section-title">Sign-in failed</h1>
+            <ErrorAlert error={error} />
+            <div className="cluster">
+              <a className="btn btn-primary" href="/login">
+                Try again
+              </a>
+              <a className="btn" href="/orgs">
+                Organizations
+              </a>
+            </div>
           </div>
         </div>
       </div>
     )
   }
 
-  return (
-    <div className="text-center py-5 text-muted">Completing sign-in…</div>
-  )
+  return <div className="loading-page">Completing sign-in…</div>
 }

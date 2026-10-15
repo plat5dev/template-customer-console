@@ -59,7 +59,7 @@ export function LoginPage() {
 
   if (!ready) {
     return (
-      <div className="text-center py-5 text-muted">Loading session…</div>
+      <div className="loading-page">Loading session…</div>
     )
   }
 
@@ -69,57 +69,48 @@ export function LoginPage() {
 
   if (joining) {
     return (
-      <div className="text-center py-5 text-muted">Joining organization…</div>
+      <div className="loading-page">Joining organization…</div>
     )
   }
 
   return (
-    <div className="row justify-content-center">
-      <div className="col-md-6 col-lg-5">
-        <div className="card shadow-sm">
-          <div className="card-body p-4">
-            <h1 className="h4 mb-3">
-              {pendingInvite ? "Join organization" : "Sign in"}
-            </h1>
-            <ErrorAlert error={error} onDismiss={() => setError(null)} />
-            {pendingInvite ? (
-              <p className="text-muted">
-                You've been invited to an organization. Sign in, or create an
-                account, and you'll join it.
-              </p>
-            ) : (
-              <p className="text-muted">
-                Sign in, or create an account, to continue.
-              </p>
-            )}
-            <button
-              type="button"
-              className="btn btn-primary w-100"
-              onClick={() => {
-                if (pendingInvite && authenticated) {
-                  const token = peekStashedInvite()
-                  if (!token) return
-                  setJoining(true)
-                  void (async () => {
-                    try {
-                      await api.redeemInvite(token)
-                      clearStashedInvite()
-                      window.location.replace("/orgs")
-                    } catch (e: unknown) {
-                      setJoining(false)
-                      setError(e)
-                    }
-                  })()
-                  return
-                }
-                void login(pendingInvite ? "/orgs" : from)
-              }}
-            >
-              {pendingInvite && authenticated
-                ? "Retry join"
-                : "Continue to Auth"}
-            </button>
-          </div>
+    <div className="center">
+      <div className="card">
+        <div className="card-body">
+          <h1 className="section-title" style={{ fontSize: "1.25rem" }}>
+            {pendingInvite ? "Join organization" : "Sign in"}
+          </h1>
+          <ErrorAlert error={error} onDismiss={() => setError(null)} />
+          <p className="section-lede">
+            {pendingInvite
+              ? "You've been invited to an organization. Sign in, or create an account, and you'll join it."
+              : "Sign in, or create an account, to continue."}
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary btn-block btn-lg"
+            onClick={() => {
+              if (pendingInvite && authenticated) {
+                const token = peekStashedInvite()
+                if (!token) return
+                setJoining(true)
+                void (async () => {
+                  try {
+                    await api.redeemInvite(token)
+                    clearStashedInvite()
+                    window.location.replace("/orgs")
+                  } catch (e: unknown) {
+                    setJoining(false)
+                    setError(e)
+                  }
+                })()
+                return
+              }
+              void login(pendingInvite ? "/orgs" : from)
+            }}
+          >
+            {pendingInvite && authenticated ? "Retry join" : "Continue to sign-in"}
+          </button>
         </div>
       </div>
     </div>

@@ -3,6 +3,8 @@ import { Link } from "react-router-dom"
 import { api } from "../api/endpoints"
 import type { ApiKeyCreated, ApiKeyListed } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
+import { KeyRow } from "../components/KeyRow"
+import { Loading, PageHead } from "../components/ui"
 import { useOrg } from "../org/OrgContext"
 
 export function ApiKeysPage() {
@@ -61,107 +63,70 @@ export function ApiKeysPage() {
   }
 
   return (
-    <div>
-      <h1 className="h3 mb-1">User API keys</h1>
-      <p className="mb-2">
-        Keys for scripts that act as you: your profile and your organizations list. To
-        work inside an org, use a member key from{" "}
-        <Link to={activeOrg ? `/orgs/${activeOrg.id}` : "/orgs"}>that org's page</Link>.
-      </p>
+    <>
+      <PageHead
+        eyebrow="/user/api-keys"
+        title="API keys"
+        lede={
+          <>
+            Keys for scripts that act as you: your profile and your organizations list. To work inside an
+            org, use a member key from{" "}
+            <Link to={activeOrg ? `/orgs/${activeOrg.id}/members` : "/orgs"}>that org's members page</Link>.
+          </>
+        }
+      />
 
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
 
       {created && (
-        <div className="alert alert-warning">
-          <div className="fw-semibold mb-1">
-            Copy now — plaintext will not be shown again
-          </div>
-          <code className="user-select-all d-block text-break">
-            {created.key}
-          </code>
-          <div className="small mt-1 text-muted">
-            prefix <code>{created.key_prefix}</code> · id{" "}
-            <code className="font-monospace">{created.id}</code>
-          </div>
+        <div className="secret">
+          <strong>Copy now. The key is not shown again.</strong>
+          <code>{created.key}</code>
+          <span className="list-meta">
+            prefix <code>{created.key_prefix}</code> · id <code>{created.id}</code>
+          </span>
         </div>
       )}
 
-      <div className="row">
-        <div className="col-lg-8 mb-4">
-          <h2 className="h5">Your user keys</h2>
-          {loading && <div className="text-muted">Loading…</div>}
-          <div className="list-group">
-            {!loading && keys.length === 0 && (
-              <div className="list-group-item text-muted">No keys yet.</div>
-            )}
-            {keys.map((k) => (
-              <div
-                key={k.id}
-                className="list-group-item d-flex justify-content-between align-items-start gap-2"
-              >
-                <div>
-                  <div className="fw-semibold">
-                    {k.name}{" "}
-                    {k.revoked_at && (
-                      <span className="badge text-bg-secondary">revoked</span>
-                    )}
-                  </div>
-                  <div className="small font-monospace text-muted">
-                    {k.key_prefix}… · {k.id}
-                  </div>
-                  <div className="small text-muted">
-                    created {k.created_at}
-                    {k.revoked_at ? ` · revoked ${k.revoked_at}` : ""}
-                  </div>
-                </div>
-                {!k.revoked_at && (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-danger"
-                    onClick={() => void onRevoke(k.id)}
-                  >
-                    Revoke
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="card mt-3">
-            <div className="card-header">Create user key</div>
-            <div className="card-body">
-              <form onSubmit={(e) => void onCreate(e)}>
-                <div className="mb-3">
-                  <label className="form-label" htmlFor="key_name">
-                    Name
-                  </label>
-                  <input
-                    id="key_name"
-                    className="form-control"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    maxLength={128}
-                    placeholder="ci-bot"
-                  />
-                </div>
-                <div className="form-text mb-3">
-                  A key is you: it has your permissions on user routes, the same
-                  as your login.
-                </div>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={creating || !name.trim()}
-                >
-                  {creating ? "Creating…" : "Create"}
-                </button>
-              </form>
+      <div className="split">
+        <section className="stack-sm">
+          <h2 className="section-title">Your user keys</h2>
+          {loading ? (
+            <Loading />
+          ) : (
+            <div className="list">
+              {keys.length === 0 && <div className="empty">No keys yet.</div>}
+              {keys.map((k) => (
+                <KeyRow key={k.id} k={k} onRevoke={() => void onRevoke(k.id)} />
+              ))}
             </div>
-          </div>
-        </div>
+          )}
+        </section>
 
+        <form className="card" onSubmit={(e) => void onCreate(e)}>
+          <div className="card-head">
+            <h2>New user key</h2>
+          </div>
+          <div className="card-body">
+            <div className="field">
+              <label htmlFor="key_name">Name</label>
+              <input
+                id="key_name"
+                className="input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                maxLength={128}
+                placeholder="ci-bot"
+              />
+              <span className="hint">A key is you: it has your permissions on user routes, like your sign-in.</span>
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={creating || !name.trim()}>
+              {creating ? "Creating…" : "Create key"}
+            </button>
+          </div>
+        </form>
       </div>
-    </div>
+    </>
   )
 }

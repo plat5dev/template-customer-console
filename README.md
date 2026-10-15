@@ -4,7 +4,13 @@ Your customers' web app. It talks to Plat5 through the **gateway** and signs in 
 
 `plat5 init` copies it into a project's `web/` folder, beside the API starter. Every `template-*-api` starter implements the same API (profiles, projects, tasks), so it works with any of them. It is a starting point the project owns: change anything.
 
-Stack: Vite · React · TypeScript · Bootstrap 5.
+Stack: Vite · React · TypeScript, with plain CSS: design tokens and a small set of components, no UI framework.
+
+## Look
+
+The look is plat5.com's: paper and ink, Inter and JetBrains Mono, light or dark from the system or the switch in the sidebar. The accent is violet, and a `starter` tag sits beside the wordmark, so a fresh app does not pass for Plat5's own product.
+
+To make it yours, change the `--accent-*` lines in `src/styles/tokens.css` (light at the top, dark in the two blocks below), and swap `src/components/Wordmark.tsx` and `public/favicon.svg` for your own. Components are in `src/styles/ui.css`; status is shown by shape (filled, hollow, struck), so no status color fights your accent.
 
 ## Run
 
@@ -23,7 +29,8 @@ bun run dev            # http://localhost:3001
 
 ```
 src/
-  pages/        one per route (App.tsx); Layout.tsx is the nav
+  pages/        one per route (App.tsx); Layout.tsx is the sidebar
+  styles/       tokens.css (colors, type, the accent) and ui.css (components)
   api/          endpoints.ts: every call, user and org routes
   auth/         sign-in (PKCE), the user token
   org/          the active org, and its member session

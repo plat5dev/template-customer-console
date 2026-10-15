@@ -7,7 +7,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
   if (!ready) {
     return (
-      <div className="text-center py-5 text-muted">Loading session…</div>
+      <div className="loading-page">Loading session…</div>
     )
   }
 

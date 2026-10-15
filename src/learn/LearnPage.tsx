@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { PageHead } from "../components/ui"
 import { config } from "../config"
 import { KeyProbe } from "./KeyProbe"
 import { OrgProbe } from "./OrgProbe"
@@ -9,25 +10,26 @@ import { OrgProbe } from "./OrgProbe"
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="card mb-3">
-      <div className="card-header">{title}</div>
-      <div className="card-body small">{children}</div>
-    </div>
+    <section className="card">
+      <div className="card-head">
+        <h2>{title}</h2>
+      </div>
+      <div className="card-body prose">{children}</div>
+    </section>
   )
 }
 
 export function LearnPage() {
   return (
-    <div className="row justify-content-center">
-      <div className="col-lg-9">
-        <h1 className="h3 mb-1">How it works</h1>
-        <p className="mb-4">
-          This app signs people in, works inside organizations, and calls your API, and the API writes none
-          of the sign-in, membership, or permission code. Plat5's gateway does. Here is how, page by page.
-        </p>
+    <div className="stack" style={{ maxWidth: "52rem" }}>
+        <PageHead
+          eyebrow="/learn"
+          title="How it works"
+          lede="This app signs people in, works inside organizations, and calls your API, and the API writes none of the sign-in, membership, or permission code. Plat5's gateway does. Here is how, page by page."
+        />
 
         <Section title="Two ideas">
-          <ul className="mb-2">
+          <ul>
             <li>
               <strong>You, as a person.</strong> Your profile, your organizations, your own API keys. Signing
               in gives you this.
@@ -41,7 +43,7 @@ export function LearnPage() {
             Every credential is one of these two. The API behind this app sees the org and the member, never
             who the person is.
           </p>
-          <ul className="mb-0">
+          <ul>
             <li>
               <strong>Sign-in</strong>: OAuth with PKCE gives a user JWT, for user routes (<code>/user/…</code>).
               A <strong>user API key</strong> is the same, for scripts.
@@ -73,7 +75,7 @@ export function LearnPage() {
             <strong>Your activity</strong> is <code>GET /user/audit-events</code>. The gateway records every
             write, with who, from where, and how it ended. Services add what changed.
           </p>
-          <p className="mb-0">
+          <p>
             <strong>App profile</strong> is <code>GET/PUT /user/profile</code> on your API. The gateway writes
             your directory id into the path (<code>/users/{"{user_id}"}/profile</code>), so the API stores the
             profile by it and never parses a token.
@@ -112,7 +114,7 @@ export function LearnPage() {
             role you pick, not yours. Its keys (
             <code>/org/service-accounts/{"{id}"}/api-keys</code>) are member keys like any other.
           </p>
-          <p className="mb-0">
+          <p>
             <strong>Your member keys</strong>: <code>GET/POST /member/api-keys</code>. Sent as{" "}
             <code>X-API-Key</code> on organization and member routes. A key carries its member's role; change the
             role and the key follows. User keys don't cover these routes.
@@ -120,7 +122,7 @@ export function LearnPage() {
         </Section>
 
         <Section title="Projects">
-          <p className="mb-0">
+          <p>
             The app calls <code>/org/projects</code> with the member session. The gateway checks it, checks the
             role's labels, and calls your API at <code>/organizations/{"{organization_id}"}/projects</code>. A
             project's page is <code>/org/projects/{"{id}"}</code>, which your API gets as{" "}
@@ -130,7 +132,7 @@ export function LearnPage() {
         </Section>
 
         <Section title="Audit log">
-          <p className="mb-0">
+          <p>
             <code>GET /org/audit-events</code> with the member session, newest first. The gateway records each
             write before calling the service, then its outcome. A service adds what changed with the{" "}
             <code>X-Plat5-Audit-Details</code> header. Reading the log needs <code>org:audit:read</code>.
@@ -138,7 +140,7 @@ export function LearnPage() {
         </Section>
 
         <Section title="User keys">
-          <p className="mb-0">
+          <p>
             <code>GET/POST /user/api-keys</code> with your sign-in. A user key is sent as <code>X-API-Key</code>{" "}
             and admitted on user routes (<code>/user/…</code>) only. On an organization or member route it is{" "}
             <code>401</code>: those take a member key or member session. Member keys look the same; the prefix
@@ -164,7 +166,7 @@ export function LearnPage() {
         </Section>
 
         <Section title="Local setup">
-          <ul className="mb-0">
+          <ul>
             <li>
               Auth on <code>{config.authIssuer}</code> with redirect <code>{config.authRedirectUri}</code> allowed
             </li>
@@ -176,7 +178,6 @@ export function LearnPage() {
             </li>
           </ul>
         </Section>
-      </div>
     </div>
   )
 }

@@ -3,8 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" href="/favicon.jpg" type="image/jpeg" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>Plat5 Starter</title>
+    <script>
+      // The stored theme, before first paint. src/theme.ts writes it.
+      try {
+        var t = localStorage.getItem("theme")
+        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

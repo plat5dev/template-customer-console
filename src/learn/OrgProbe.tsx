@@ -57,27 +57,27 @@ export function OrgProbe() {
   return (
     <>
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
-      <form className="card card-body" onSubmit={(e) => void onProbe(e)}>
-        <div className="mb-3">
-          <label className="form-label" htmlFor="probe_org">
-            Organization ID
-          </label>
+      <form className="inset" onSubmit={(e) => void onProbe(e)}>
+        <div className="field">
+          <label htmlFor="probe_org">Organization ID</label>
           <input
             id="probe_org"
-            className="form-control font-monospace"
+            className="input mono"
             value={orgId}
             onChange={(e) => setOrgId(e.target.value)}
             placeholder="another org id or random ULID"
             required
           />
-          <div className="form-text">Tip: create a second org, copy its id, and try it here.</div>
+          <span className="hint">Tip: create a second org, copy its id, and try it here.</span>
         </div>
-        <button type="submit" className="btn btn-outline-secondary" disabled={probing || !orgId.trim()}>
-          {probing ? "Probing…" : "Mint session"}
-        </button>
+        <div>
+          <button type="submit" className="btn" disabled={probing || !orgId.trim()}>
+            {probing ? "Probing…" : "Mint session"}
+          </button>
+        </div>
       </form>
       {result && (
-        <pre className="mt-3 p-3 bg-body-secondary rounded small overflow-auto" style={{ maxHeight: "16rem" }}>
+        <pre className="pre" style={{ maxHeight: "16rem" }}>
           {result}
         </pre>
       )}

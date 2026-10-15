@@ -27,8 +27,7 @@ export function RoleSelect({
   return (
     <select
       id={id}
-      className="form-select form-select-sm"
-      style={{ width: "auto" }}
+      className={id ? "select" : "select select-sm auto"}
       aria-label={ariaLabel ?? "Role"}
       value={value}
       disabled={disabled}

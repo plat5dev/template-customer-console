@@ -87,50 +87,44 @@ export function KeyProbe() {
   return (
     <>
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
-      <form className="card card-body" onSubmit={onTry}>
-        <div className="mb-3">
-          <label className="form-label" htmlFor="try_key">
-            API key
-          </label>
+      <form className="inset" onSubmit={onTry}>
+        <div className="field">
+          <label htmlFor="try_key">API key</label>
           <input
             id="try_key"
-            className="form-control font-monospace"
+            className="input mono"
             value={key}
             onChange={(e) => setKey(e.target.value)}
             placeholder="plat5-k-2-… or plat5-s-2-…"
             required
           />
           {session && (
-            <button
-              type="button"
-              className="btn btn-sm btn-outline-secondary mt-2"
-              onClick={() => setKey(session.token)}
-            >
-              Use member session
-            </button>
+            <div>
+              <button type="button" className="btn btn-sm" onClick={() => setKey(session.token)}>
+                Use member session
+              </button>
+            </div>
           )}
         </div>
-        <div className="mb-3">
-          <label className="form-label" htmlFor="try_path">
-            Path
-          </label>
+        <div className="field">
+          <label htmlFor="try_path">Path</label>
           <input
             id="try_path"
-            className="form-control font-monospace"
+            className="input mono"
             value={path}
             onChange={(e) => setPath(e.target.value)}
             required
           />
-          <div className="form-text d-flex flex-wrap gap-2 mt-2">
+          <div className="cluster">
             {shortcuts.map(([label, p]) => (
-              <button key={p} type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setPath(p)}>
+              <button key={p} type="button" className="btn btn-sm btn-ghost" onClick={() => setPath(p)}>
                 {label}
               </button>
             ))}
           </div>
         </div>
-        <div className="d-flex flex-wrap gap-2">
-          <button type="submit" className="btn btn-outline-primary" disabled={running || !key.trim()}>
+        <div className="cluster">
+          <button type="submit" className="btn" disabled={running || !key.trim()}>
             GET path
           </button>
           <button type="button" className="btn btn-primary" disabled={running || !key.trim()} onClick={onMatrix}>
@@ -139,12 +133,12 @@ export function KeyProbe() {
         </div>
       </form>
       {!activeOrg && (
-        <p className="small text-muted mt-2 mb-0">
+        <p className="small muted">
           Select an organization to mint a member session. Member keys are on that org's page.
         </p>
       )}
       {result && (
-        <pre className="mt-3 p-3 bg-body-secondary rounded small overflow-auto" style={{ maxHeight: "28rem" }}>
+        <pre className="pre" style={{ maxHeight: "28rem" }}>
           {result}
         </pre>
       )}

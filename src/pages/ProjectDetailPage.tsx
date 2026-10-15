@@ -1,9 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react"
 import { Link, useParams } from "react-router-dom"
 import { api } from "../api/endpoints"
-import { ApiError } from "../api/client"
 import type { MemberSession, Project, Task, TaskStatus } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
+import { NoOrg } from "../components/NoOrg"
+import { SessionError } from "../components/SessionError"
+import { Loading, PageHead } from "../components/ui"
 import { useOrg } from "../org/OrgContext"
 
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "done"]
@@ -18,37 +20,13 @@ export function ProjectDetailPage() {
     refreshSession,
   } = useOrg()
 
-  if (!activeOrg) {
-    return (
-      <div className="alert alert-warning">
-        Select an organization. <Link to="/orgs">Organizations</Link>
-      </div>
-    )
-  }
-
+  if (!activeOrg) return <NoOrg />
   if (sessionError) {
     return (
-      <>
-        <ErrorAlert error={sessionError} />
-        <p className="small text-muted">
-          {sessionError instanceof ApiError && sessionError.status === 404
-            ? "Not an active member. Organization and member routes are not called with the user JWT."
-            : "Projects use a member session, not the user JWT."}
-        </p>
-        <button
-          type="button"
-          className="btn btn-sm btn-outline-secondary"
-          onClick={refreshSession}
-        >
-          Retry session
-        </button>
-      </>
+      <SessionError error={sessionError} onRetry={refreshSession} hint="Projects use a member session, not the user JWT." />
     )
   }
-
-  if (sessionLoading || !session || !projectId) {
-    return <div className="text-muted">Opening member session…</div>
-  }
+  if (sessionLoading || !session || !projectId) return <Loading>Opening member session…</Loading>
 
   return (
     <ProjectDetailLoaded
@@ -209,61 +187,81 @@ function ProjectDetailLoaded({
     }
   }
 
-  if (loading) {
-    return <div className="text-muted">Loading…</div>
-  }
+  if (loading) return <Loading />
 
   if (!project) {
     return (
-      <>
+      <div className="stack narrow">
         <ErrorAlert error={error} />
-        <Link to="/projects">← Back to projects</Link>
-      </>
+        <Link to="/projects">Back to projects</Link>
+      </div>
     )
   }
 
-  return (
-    <div>
-      <nav aria-label="breadcrumb">
-        <ol className="breadcrumb">
-          <li className="breadcrumb-item">
-            <Link to="/projects">Projects</Link>
-          </li>
-          <li className="breadcrumb-item active" aria-current="page">
-            {project.name}
-          </li>
-        </ol>
-      </nav>
+  const counts = STATUSES.map((st) => [st, tasks.filter((t) => t.status === st).length] as const)
 
-      <h1 className="h3 mb-1">{project.name}</h1>
-      <p className="small font-monospace text-muted mb-3">{project.id}</p>
+  return (
+    <>
+      <PageHead
+        crumbs={
+          <>
+            <Link to="/projects">Projects</Link>
+            <span>{project.name}</span>
+          </>
+        }
+        title={project.name}
+        eyebrow={project.id}
+        lede={project.description || undefined}
+      />
+
+      <div className="stats">
+        {counts.map(([st, n]) => (
+          <span key={st}>
+            <b>{n}</b>
+            {st.replace("_", " ")}
+          </span>
+        ))}
+      </div>
 
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
-      {projectSaved && (
-        <div className="alert alert-success py-2">Project saved.</div>
-      )}
+      {projectSaved && <div className="alert alert-ok">Project saved.</div>}
 
-      <div className="row">
-        <div className="col-lg-8 mb-4">
-          <h2 className="h5">Tasks</h2>
-          <div className="list-group">
-            {tasks.length === 0 && (
-              <div className="list-group-item text-muted">No tasks yet.</div>
-            )}
+      <div className="split">
+        <section className="stack-sm">
+          <h2 className="section-title">Tasks</h2>
+          <form className="form-row" onSubmit={(e) => void onCreateTask(e)}>
+            <div className="field">
+              <label htmlFor="task_title" className="small">
+                New task
+              </label>
+              <input
+                id="task_title"
+                className="input"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+                maxLength={255}
+                placeholder="What needs doing?"
+              />
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={creating || !title.trim()}>
+              {creating ? "Adding…" : "Add task"}
+            </button>
+          </form>
+          <div className="list">
+            {tasks.length === 0 && <div className="empty">No tasks yet.</div>}
             {tasks.map((t) => (
-              <div
-                key={t.id}
-                className="list-group-item d-flex flex-wrap gap-2 justify-content-between align-items-center"
-              >
-                <div className="flex-grow-1" style={{ minWidth: "12rem" }}>
+              <div key={t.id} className="list-item">
+                <div>
                   {editingTaskId === t.id ? (
-                    <div className="input-group input-group-sm">
+                    <div className="input-group">
                       <input
-                        className="form-control"
+                        className="input input-sm"
                         value={editTaskTitle}
                         onChange={(e) => setEditTaskTitle(e.target.value)}
                         maxLength={255}
                         autoFocus
+                        aria-label="Task title"
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             e.preventDefault()
@@ -274,17 +272,13 @@ function ProjectDetailLoaded({
                       />
                       <button
                         type="button"
-                        className="btn btn-primary"
+                        className="btn btn-sm btn-primary"
                         disabled={savingTask || !editTaskTitle.trim()}
                         onClick={() => void onSaveTaskTitle(t)}
                       >
                         Save
                       </button>
-                      <button
-                        type="button"
-                        className="btn btn-outline-secondary"
-                        onClick={() => setEditingTaskId(null)}
-                      >
+                      <button type="button" className="btn btn-sm" onClick={() => setEditingTaskId(null)}>
                         Cancel
                       </button>
                     </div>
@@ -292,116 +286,74 @@ function ProjectDetailLoaded({
                     <>
                       <button
                         type="button"
-                        className="btn btn-link p-0 fw-semibold text-decoration-none text-start"
+                        className="btn-link list-title"
+                        style={{ textAlign: "left", color: "var(--text)", cursor: "text" }}
+                        title="Rename"
                         onClick={() => startEditTask(t)}
                       >
-                        {t.title}
+                        <span style={t.status === "done" ? { textDecoration: "line-through", color: "var(--muted)" } : undefined}>
+                          {t.title}
+                        </span>
                       </button>
-                      <div className="small font-monospace text-muted">
-                        {t.id}
-                      </div>
+                      <div className="list-meta mono">{t.id}</div>
                     </>
                   )}
                 </div>
-                <div className="d-flex gap-2 align-items-center">
+                <div className="cluster">
                   <select
-                    className="form-select form-select-sm"
-                    style={{ width: "auto" }}
+                    className="select select-sm auto"
                     value={t.status}
-                    onChange={(e) =>
-                      void onStatus(t, e.target.value as TaskStatus)
-                    }
+                    aria-label={`Status of ${t.title}`}
+                    onChange={(e) => void onStatus(t, e.target.value as TaskStatus)}
                   >
-                    {STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
+                    {STATUSES.map((st) => (
+                      <option key={st} value={st}>
+                        {st.replace("_", " ")}
                       </option>
                     ))}
                   </select>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-danger"
-                    onClick={() => void onDeleteTask(t)}
-                  >
+                  <button type="button" className="btn btn-sm btn-ghost" onClick={() => void onDeleteTask(t)}>
                     Delete
                   </button>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
-        <div className="col-lg-4">
-          <div className="card mb-3">
-            <div className="card-header">Edit project</div>
-            <div className="card-body">
-              <form onSubmit={(e) => void onSaveProject(e)}>
-                <div className="mb-3">
-                  <label className="form-label" htmlFor="proj_name">
-                    Name
-                  </label>
-                  <input
-                    id="proj_name"
-                    className="form-control"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    required
-                    maxLength={255}
-                  />
-                </div>
-                <div className="mb-3">
-                  <label className="form-label" htmlFor="proj_desc">
-                    Description
-                  </label>
-                  <textarea
-                    id="proj_desc"
-                    className="form-control"
-                    rows={2}
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                    maxLength={2000}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="btn btn-outline-primary"
-                  disabled={savingProject || !editName.trim()}
-                >
-                  {savingProject ? "Saving…" : "Save project"}
-                </button>
-              </form>
-            </div>
+        <form className="card" onSubmit={(e) => void onSaveProject(e)}>
+          <div className="card-head">
+            <h2>Project</h2>
           </div>
-
-          <div className="card">
-            <div className="card-header">New task</div>
-            <div className="card-body">
-              <form onSubmit={(e) => void onCreateTask(e)}>
-                <div className="mb-3">
-                  <label className="form-label" htmlFor="task_title">
-                    Title
-                  </label>
-                  <input
-                    id="task_title"
-                    className="form-control"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    required
-                    maxLength={255}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={creating || !title.trim()}
-                >
-                  {creating ? "Adding…" : "Add task"}
-                </button>
-              </form>
+          <div className="card-body">
+            <div className="field">
+              <label htmlFor="proj_name">Name</label>
+              <input
+                id="proj_name"
+                className="input"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                required
+                maxLength={255}
+              />
             </div>
+            <div className="field">
+              <label htmlFor="proj_desc">Description</label>
+              <textarea
+                id="proj_desc"
+                className="textarea"
+                rows={3}
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                maxLength={2000}
+              />
+            </div>
+            <button type="submit" className="btn" disabled={savingProject || !editName.trim()}>
+              {savingProject ? "Saving…" : "Save project"}
+            </button>
           </div>
-        </div>
+        </form>
       </div>
-    </div>
+    </>
   )
 }

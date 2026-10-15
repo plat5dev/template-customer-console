@@ -4,6 +4,7 @@ import type { CreateInviteBody, Invite, Role } from "../api/types"
 import { inviteAppUrl } from "../auth/session"
 import { defaultOption } from "../api/roles"
 import { RoleSelect } from "./RoleSelect"
+import { Status } from "./ui"
 
 const INVITE_TTL_OPTIONS: { label: string; value: string }[] = [
   { label: "Default (7 days)", value: "" },
@@ -116,30 +117,18 @@ export function InvitePanel({
     : null
 
   return (
-    <div className="card mb-4">
-      <div className="card-header">Invite people</div>
-      <div className="card-body">
-        <p className="mb-2">
-          Send someone a link. When they sign in, they join this organization.
-        </p>
+    <div className="split">
+      <section className="stack">
         {!canManage && (
-          <p className="small text-muted">
-            Your role can't invite people (needs <code>org:members:write</code>).
-          </p>
+          <div className="alert alert-warn">
+            Your role can't list or create invites (needs <code>org:members:write</code>).
+          </div>
         )}
         {createdInvite && createdLink && createdInvite.token && (
-          <div className="alert alert-warning">
-            <div className="fw-semibold mb-1">Invite minted</div>
-            <code className="user-select-all d-block text-break mb-2">
-              {createdInvite.token}
-            </code>
-            <div className="small mb-2">
-              Link{" "}
-              <code className="user-select-all d-block text-break">
-                {createdLink}
-              </code>
-            </div>
-            <div className="d-flex flex-wrap gap-2 mb-2">
+          <div className="secret">
+            <strong>Invite link ready{copied === "link" ? ", and copied" : ""}</strong>
+            <code>{createdLink}</code>
+            <div className="cluster">
               <button
                 type="button"
                 className="btn btn-sm btn-primary"
@@ -149,55 +138,42 @@ export function InvitePanel({
               </button>
               <button
                 type="button"
-                className="btn btn-sm btn-outline-secondary"
+                className="btn btn-sm"
                 onClick={() => void copyText("token", createdInvite.token!)}
               >
                 {copied === "token" ? "Copied token" : "Copy token"}
               </button>
             </div>
-            <div className="small text-muted">
-              {createdInvite.status} · expires {createdInvite.expires_at} · id{" "}
-              <code className="font-monospace">{createdInvite.id}</code>
+            <div className="list-meta">
+              {createdInvite.status} · expires {new Date(createdInvite.expires_at).toLocaleString()} · id{" "}
+              <code>{createdInvite.id}</code>
             </div>
           </div>
         )}
-        <div className="list-group mb-3">
-          {canManage && invites.length === 0 && (
-            <div className="list-group-item text-muted">No invites listed.</div>
-          )}
+        <div className="list">
+          {canManage && invites.length === 0 && <div className="empty">No invites yet.</div>}
           {invites.map((inv) => (
-            <div
-              key={inv.id}
-              className="list-group-item d-flex flex-wrap gap-2 justify-content-between align-items-start"
-            >
+            <div key={inv.id} className="list-item">
               <div>
-                <div className="small font-monospace">
-                  {inv.token_prefix}… · {inv.id}
+                <div className="cluster">
+                  <code className="list-title">{inv.token_prefix}…</code>
+                  <Status value={inv.status} />
+                  {inv.role && <span className="badge">{inv.role}</span>}
                 </div>
-                <div className="small text-muted">
-                  {inv.status}
-                  {inv.role ? ` · role ${inv.role}` : ""}
-                  {inv.email ? ` · ${inv.email}` : ""}
-                  {` · ${inv.use_count}/${inv.max_uses ?? "unlimited"}`}
-                  {` · expires ${inv.expires_at}`}
+                <div className="list-meta">
+                  {inv.email ? `${inv.email} · ` : ""}
+                  {`used ${inv.use_count}/${inv.max_uses ?? "∞"}`}
+                  {` · expires ${new Date(inv.expires_at).toLocaleString()}`}
                 </div>
               </div>
-              <div className="d-flex flex-wrap gap-1">
+              <div className="cluster">
                 {inv.token && (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary"
-                    onClick={() => void copyText("link", inv.token!)}
-                  >
+                  <button type="button" className="btn btn-sm" onClick={() => void copyText("link", inv.token!)}>
                     Copy link
                   </button>
                 )}
                 {inv.status === "active" && (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-danger"
-                    onClick={() => void onRevokeInvite(inv.id)}
-                  >
+                  <button type="button" className="btn btn-sm btn-danger" onClick={() => void onRevokeInvite(inv.id)}>
                     Revoke
                   </button>
                 )}
@@ -205,15 +181,19 @@ export function InvitePanel({
             </div>
           ))}
         </div>
-        <form
-          className="row g-2 align-items-end"
-          onSubmit={(e) => void onCreateInvite(e)}
-        >
+      </section>
+
+      <form className="card" onSubmit={(e) => void onCreateInvite(e)}>
+        <div className="card-head">
+          <h2>New invite link</h2>
+        </div>
+        <div className="card-body">
+          <p className="section-lede">
+            Send someone the link. When they sign in, they join this organization. Plat5 sends no email.
+          </p>
           {roles.length > 0 && (
-            <div className="col-md-12">
-              <label className="form-label" htmlFor="invite_role">
-                Role
-              </label>
+            <div className="field">
+              <label htmlFor="invite_role">Role</label>
               <RoleSelect
                 id="invite_role"
                 roles={roles}
@@ -221,20 +201,16 @@ export function InvitePanel({
                 onChange={setInviteRole}
                 empty={defaultOption(defaultRole)}
               />
-              <div className="form-text">
-                The role's labels come from the deployment's roles. Anyone
-                who may create invites may hand out any role, even one with more
-                labels than their own.
-              </div>
+              <span className="hint">
+                Anyone who may create invites may hand out any role, even one with more labels than their own.
+              </span>
             </div>
           )}
-          <div className="col-md-8">
-            <label className="form-label" htmlFor="invite_ttl">
-              Expires
-            </label>
+          <div className="field">
+            <label htmlFor="invite_ttl">Expires</label>
             <select
               id="invite_ttl"
-              className="form-select"
+              className="select"
               value={inviteTtl}
               onChange={(e) => setInviteTtl(e.target.value)}
             >
@@ -245,18 +221,16 @@ export function InvitePanel({
               ))}
             </select>
           </div>
-          <div className="col-md-4">
-            <button
-              type="submit"
-              className="btn btn-primary w-100"
-              disabled={creatingInvite || !canManage}
-              title={canManage ? undefined : "Needs org:members:write"}
-            >
-              {creatingInvite ? "…" : "Create invite link"}
-            </button>
-          </div>
-        </form>
-      </div>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={creatingInvite || !canManage}
+            title={canManage ? undefined : "Needs org:members:write"}
+          >
+            {creatingInvite ? "Creating…" : "Create invite link"}
+          </button>
+        </div>
+      </form>
     </div>
   )
 }

@@ -1,10 +1,11 @@
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
-import "bootstrap/dist/css/bootstrap.min.css"
-import "bootstrap/dist/js/bootstrap.bundle.min.js"
+import "@fontsource-variable/inter/opsz.css"
+import "@fontsource-variable/jetbrains-mono"
+import "./styles/tokens.css"
+import "./styles/ui.css"
 import App from "./App"
 import { appName } from "./appName"
-import "./styles.css"
 
 document.title = appName
 
