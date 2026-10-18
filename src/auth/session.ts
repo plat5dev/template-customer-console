@@ -2,12 +2,12 @@ import type { MemberSession } from "../api/types"
 import { config } from "../config"
 import { randomString, sha256Challenge } from "./pkce"
 
-const STORAGE_KEY = "plat5.web-demo.tokens"
-const PKCE_KEY = "plat5.web-demo.pkce"
+const STORAGE_KEY = "plat5.customer-console.tokens"
+const PKCE_KEY = "plat5.customer-console.pkce"
 /** Origin sessionStorage map: OAuth CSRF `state` → invite token (Auth0 appState). */
-const INVITE_BY_STATE_KEY = "plat5.web-demo.invite.by-state"
+const INVITE_BY_STATE_KEY = "plat5.customer-console.invite.by-state"
 
-/** Web-demo login query (`/login?invite=`). Not forwarded to Auth `/authorize`. */
+/** Customer console login query (`/login?invite=`). Not forwarded to Auth `/authorize`. */
 export const INVITE_QUERY = "invite"
 
 /**
@@ -15,7 +15,7 @@ export const INVITE_QUERY = "invite"
  * Not `plat5_invite_token` (that was Auth's IdP cookie).
  * Covers already-had-a-tab; the state-keyed stash covers PKCE / ITP.
  */
-export const INVITE_COOKIE = "plat5_web_demo_invite"
+export const INVITE_COOKIE = "plat5_customer_console_invite"
 
 const INVITE_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 
@@ -56,7 +56,7 @@ export function clearSession(): void {
 }
 
 /** This tab's member sessions, by org id, for the person signed in. */
-const MEMBER_SESSIONS_KEY = "plat5.web-demo.member-sessions"
+const MEMBER_SESSIONS_KEY = "plat5.customer-console.member-sessions"
 /** Mint a new one this long before the cached one expires. */
 const MEMBER_SESSION_MARGIN_MS = 60_000
 

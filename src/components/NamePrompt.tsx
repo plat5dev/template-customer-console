@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react"
 import { api } from "../api/endpoints"
 import { useAuth } from "../auth/AuthContext"
 
-const DISMISSED_KEY = "plat5.web-demo.name-prompt-dismissed"
+const DISMISSED_KEY = "plat5.customer-console.name-prompt-dismissed"
 
 /**
  * Asks a person with no name for one, once. Identity creates a person at first

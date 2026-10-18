@@ -13,7 +13,7 @@ import type { MemberSession, OrganizationRef } from "../api/types"
 import { useAuth } from "../auth/AuthContext"
 import { cachedMemberSession, cacheMemberSession } from "../auth/session"
 
-const STORAGE_KEY = "plat5.web-demo.active-org"
+const STORAGE_KEY = "plat5.customer-console.active-org"
 
 type OrgState = {
   orgs: OrganizationRef[]

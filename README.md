@@ -1,8 +1,8 @@
-# Web app
+# Customer console
 
-Your customers' web app. It talks to Plat5 through the **gateway** and signs in with **Plat5 Auth** (browser OAuth/PKCE redirect): profile, user and member API keys, organizations, members, service accounts, invite links, projects, and tasks.
+Your customers' console. It talks to Plat5 through the **gateway** and signs in with **Plat5 Auth** (browser OAuth/PKCE redirect): profile, user and member API keys, organizations, members, service accounts, invite links, projects, and tasks.
 
-`plat5 init` copies it into a project's `web/` folder, beside the API starter. Every `template-*-api` starter implements the same API (profiles, projects, tasks), so it works with any of them. It is a starting point the project owns: change anything.
+`plat5 init` copies it into a project's `customer-console/` folder, beside the API starter. Every `template-*-api` starter implements the same API (profiles, projects, tasks), so it works with any of them. It is a starting point the project owns: change anything.
 
 Stack: Vite · React · TypeScript, with plain CSS: design tokens and a small set of components, no UI framework.
 
@@ -44,7 +44,7 @@ To drop the teaching material: delete `src/learn/`, its route in `src/App.tsx`, 
 
 ## Image
 
-For production, the Dockerfile's last stage builds the app and serves it with nginx on `:8080`; `ghcr.io/plat5dev/template-web` is that image. Settings are the container's environment, read at start, so one image serves any stack. Unset ones fall back to the defaults below. Images are built on `v*` tags.
+For production, the Dockerfile's last stage builds the app and serves it with nginx on `:8080` (`docker build -t my-console .`). Settings are the container's environment, read at start, so one image serves any stack. Unset ones fall back to the defaults below.
 
 | Container env | Build-time (`bun run dev`) | Default |
 |---------------|----------------------------|---------|
@@ -63,7 +63,7 @@ The browser does not send subject ids. User routes use the user JWT (`Authorizat
 
 Roles: with roles on (`roles.yml`, applied to the control plane), the org page shows your role and its labels (from the session mint), a role picker on invite, add-member, and service-account create, and role / status / remove on other members (`PATCH` / `DELETE /org/members/{id}`). Controls whose label you lack are disabled; the gateway still decides, and a 403 names the `required_labels`. With roles off, members have no role, every member holds every label, and the role controls are hidden.
 
-Invite copy-link is `{origin}/login?invite={token}`. Already signed in: redeem immediately (skip PKCE). Else the app stashes the token in a first-party cookie (`plat5_web_demo_invite`) plus an origin stash keyed by OAuth CSRF `state`, strips the query so Referer to Auth cannot leak it, starts PKCE (Auth `/authorize` does **not** get `invite=`; token never in OAuth `state`), then `POST /user/invites/redeem` with `{ "token" }` and the user JWT. Cookie/stash clear only after a successful redeem. Adding by IdP subject (shown on the Profile page) still works. Email is unbound. No SMTP.
+Invite copy-link is `{origin}/login?invite={token}`. Already signed in: redeem immediately (skip PKCE). Else the app stashes the token in a first-party cookie (`plat5_customer_console_invite`) plus an origin stash keyed by OAuth CSRF `state`, strips the query so Referer to Auth cannot leak it, starts PKCE (Auth `/authorize` does **not** get `invite=`; token never in OAuth `state`), then `POST /user/invites/redeem` with `{ "token" }` and the user JWT. Cookie/stash clear only after a successful redeem. Adding by IdP subject (shown on the Profile page) still works. Email is unbound. No SMTP.
 
 ## Auth notes
 

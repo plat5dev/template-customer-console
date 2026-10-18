@@ -1,4 +1,4 @@
-# The starter web app behind nginx on :8080. Settings come from the container's
+# The customer console behind nginx on :8080. Settings come from the container's
 # environment at start (docker/config.sh), not the build: GATEWAY_URL, AUTH_ISSUER,
 # AUTH_CLIENT_ID, AUTH_REDIRECT_URI, AUTH_AUDIENCE, AUTH_USER_ID_CLAIM. Unset ones
 # fall back to the local defaults `plat5 start` uses.

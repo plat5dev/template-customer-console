@@ -1,7 +1,8 @@
-# plat5 init copies this app into a project's web/ folder, beside the API starter.
-name: web
-kind: web
-description: Vite + React web app for your customers (sign-in, orgs, members, keys, projects)
+# plat5 init copies this app into a project's customer-console/ folder, beside the
+# API starter: your customers' console, a client of the Plat5 gateway.
+name: customer-console
+kind: customer-console
+description: Vite + React console for your customers (sign-in, orgs, members, keys, projects)
 
 substitute:
   - src/appName.ts

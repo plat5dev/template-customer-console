@@ -1,14 +1,14 @@
-# The web app, in development: Vite on :3001, reloading as you edit. plat5 start
+# The customer console, in development: Vite on :3001, reloading as you edit. plat5 start
 # runs it (the project's docker-compose.yml includes this file) and passes where
 # Plat5 is. The production image is the Dockerfile's last stage.
 services:
-  web:
+  customer-console:
     build:
       context: .
       target: dev
     labels:
-      service.name: web
-      service.namespace: web
+      service.name: customer-console
+      service.namespace: customer-console
     ports:
       - "3001:3001"
     environment:
@@ -17,7 +17,7 @@ services:
       VITE_AUTH_CLIENT_ID: ${PLAT5_AUTH_CLIENT_ID:-plat5}
     volumes:
       - .:/app
-      - web_node_modules:/app/node_modules
+      - customer_console_node_modules:/app/node_modules
     healthcheck:
       test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3001/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 5s
@@ -26,4 +26,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  web_node_modules:
+  customer_console_node_modules:
