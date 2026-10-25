@@ -4,9 +4,9 @@ import { config } from "../config"
 import { KeyProbe } from "./KeyProbe"
 import { OrgProbe } from "./OrgProbe"
 
-// How Plat5 does what this app does, page by page, and two probes to try it.
-// All of it is here, in src/learn/: delete the folder, its route in App.tsx, and
-// its link in Layout.tsx, and the app has none of it.
+// How Plat5 does what this app does, and two probes to try it. All of it is
+// here, in src/learn/: delete the folder, its route in App.tsx, and its link in
+// Layout.tsx, and the app has none of it.
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -22,162 +22,112 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export function LearnPage() {
   return (
     <div className="stack" style={{ maxWidth: "52rem" }}>
-        <PageHead
-          eyebrow="/learn"
-          title="How it works"
-          lede="This app signs people in, works inside organizations, and calls your API, and the API writes none of the sign-in, membership, or permission code. Plat5's gateway does. Here is how, page by page."
-        />
+      <PageHead
+        eyebrow="/learn"
+        title="How it works"
+        lede="This app signs people in, works inside organizations and projects, and calls your API, and the API writes none of the sign-in, membership, or permission code. Plat5's gateway does. Here is how."
+      />
 
-        <Section title="Two ideas">
-          <ul>
-            <li>
-              <strong>You, as a person.</strong> Your profile, your organizations, your own API keys. Signing
-              in gives you this.
-            </li>
-            <li>
-              <strong>You, inside an organization.</strong> A member, with a role. Projects and everything
-              else in the org belong to the org, not to you.
-            </li>
-          </ul>
-          <p>
-            Every credential is one of these two. The API behind this app sees the org and the member, never
-            who the person is.
-          </p>
-          <ul>
-            <li>
-              <strong>Sign-in</strong>: OAuth with PKCE gives a user JWT, for user routes (<code>/user/…</code>).
-              A <strong>user API key</strong> is the same, for scripts.
-            </li>
-            <li>
-              <strong>Member session</strong>: minted for the org you pick (
-              <code>POST /user/organizations/{"{id}"}/session</code>), and sent as <code>X-API-Key</code> on
-              organization and member routes (<code>/org/…</code>, <code>/member/…</code>). It exists so the API
-              gets an org-scoped credential and never the person's id. Not an active member: the mint is{" "}
-              <code>404</code>.
-            </li>
-            <li>
-              <strong>Member API keys</strong> are a member's long-lived credential (<code>/member/api-keys</code>
-              ). A <strong>service account</strong> is a member with keys and no person.
-            </li>
-            <li>
-              The gateway checks the credential, then writes the org into the path: <code>/org/projects</code>{" "}
-              reaches the API as <code>/organizations/{"{organization_id}"}/projects</code>.
-            </li>
-          </ul>
-        </Section>
+      <Section title="One credential">
+        <p>
+          Signing in (OAuth with PKCE) gives a token, and every call sends it as <code>Authorization: Bearer</code>.
+          The same token reaches every org you're in; there are no sessions. A personal API key (
+          <code>/user/keys</code>) and a service account's key go in the same header.
+        </p>
+      </Section>
 
-        <Section title="Profile">
-          <p>
-            <strong>Account</strong> is identity's directory (<code>GET/PATCH/DELETE /user</code>) with your
-            sign-in. The directory is private: organizations see your name and status, never your id or email.
-          </p>
-          <p>
-            <strong>Your activity</strong> is <code>GET /user/audit-events</code>. The gateway records every
-            write, with who, from where, and how it ended. Services add what changed.
-          </p>
-          <p>
-            <strong>App profile</strong> is <code>GET/PUT /user/profile</code> on your API. The gateway writes
-            your directory id into the path (<code>/users/{"{user_id}"}/profile</code>), so the API stores the
-            profile by it and never parses a token.
-          </p>
-        </Section>
+      <Section title="The path names the node">
+        <p>
+          The tree is organizations, and projects inside them. Paths carry slugs:{" "}
+          <code>/orgs/acme/projects/web/tasks</code>. This app's pages use the same paths. The gateway resolves the
+          slugs, checks your roles there, and calls your API at <code>/projects/{"{project_id}"}/tasks</code> with
+          your member id in <code>X-Plat5-Member-Id</code>. Your API never sees a token, a slug, or who you are
+          outside that org.
+        </p>
+        <p>
+          Your own data is on user routes: <code>GET /user</code>, <code>/user/keys</code>, and your API's{" "}
+          <code>/user/profile</code>, which it gets as <code>/users/{"{user_id}"}/profile</code>.
+        </p>
+      </Section>
 
-        <Section title="Organizations">
-          <p>
-            The list is <code>GET /user/memberships</code> with your sign-in; creating one is{" "}
-            <code>POST /user/organizations</code>. Picking one mints a member session, which this app keeps until
-            it expires. Organization and member calls send it as <code>X-API-Key</code>, and the gateway writes
-            the org into the path.
-          </p>
-          <p>
-            Everything on an org's page uses that member session, not your sign-in.{" "}
-            <code>GET/PATCH/DELETE /org</code> reaches identity as{" "}
-            <code>/organizations/{"{organization_id}"}</code>. Buttons your role can't use are disabled; the
-            gateway would answer <code>403</code> anyway.
-          </p>
-          <p>
-            <strong>Members</strong>: <code>GET/POST /org/members</code>. The org never sees a person's user id:
-            you can also add someone by their IdP subject, shown on their Profile page. Service accounts are
-            listed too (<code>principal=service_account</code>). Your own status is <code>PATCH /member</code>;
-            others are <code>PATCH/DELETE /org/members/{"{id}"}</code>. Whoever holds{" "}
-            <code>org:members:write</code> may assign any role, including to themselves.
-          </p>
-          <p>
-            <strong>Invites</strong>: <code>POST /org/invites</code> mints a token. The link is{" "}
-            <code>/login?invite=</code> on this app. The invitee's browser keeps the token (a first-party cookie,
-            and a stash keyed by the OAuth <code>state</code>), strips it from the URL, and signs in with PKCE:
-            the token never reaches <code>/authorize</code>. Then <code>POST /user/invites/redeem</code> with the
-            token and their user JWT makes them an active member. Plat5 sends no email; you share the link.
-          </p>
-          <p>
-            <strong>Service accounts</strong>: creating one adds a service account and an active member with the
-            role you pick, not yours. Its keys (
-            <code>/org/service-accounts/{"{id}"}/api-keys</code>) are member keys like any other.
-          </p>
-          <p>
-            <strong>Your member keys</strong>: <code>GET/POST /member/api-keys</code>. Sent as{" "}
-            <code>X-API-Key</code> on organization and member routes. A key carries its member's role; change the
-            role and the key follows. User keys don't cover these routes.
-          </p>
-        </Section>
+      <Section title="What you can do here">
+        <p>
+          <code>GET …/membership</code> on an org or a project answers with your member id, the roles that count
+          there (bound on it, or on the org above it), and the permissions they grant. This app shows the roles,
+          marks you in lists, and hides what you can't use. The gateway decides anyway: a refusal is{" "}
+          <code>403</code>, with <code>required_permissions</code> in its details.
+        </p>
+        <p>
+          A <code>403</code> never says whether something exists: an org you're not in and one that doesn't exist
+          answer the same.
+        </p>
+      </Section>
 
-        <Section title="Projects">
-          <p>
-            The app calls <code>/org/projects</code> with the member session. The gateway checks it, checks the
-            role's labels, and calls your API at <code>/organizations/{"{organization_id}"}/projects</code>. A
-            project's page is <code>/org/projects/{"{id}"}</code>, which your API gets as{" "}
-            <code>/organizations/{"{organization_id}"}/projects/{"{id}"}</code>: it only finds the project if it's
-            in that org.
-          </p>
-        </Section>
+      <Section title="Lists show what you can see">
+        <p>
+          <code>GET /user/nodes?kind=organization</code> is the org switcher. <code>GET /orgs/{"{organization}"}/projects</code>{" "}
+          returns the projects you can read, so someone with a role on one project sees that one. Lists page with{" "}
+          <code>has_more</code>; this app walks every page.
+        </p>
+      </Section>
 
-        <Section title="Audit log">
-          <p>
-            <code>GET /org/audit-events</code> with the member session, newest first. The gateway records each
-            write before calling the service, then its outcome. A service adds what changed with the{" "}
-            <code>X-Plat5-Audit-Details</code> header. Reading the log needs <code>org:audit:read</code>.
-          </p>
-        </Section>
+      <Section title="Who has access">
+        <p>
+          A <strong>binding</strong> gives a member a role on one node. <strong>Access</strong> lists every binding
+          that counts there, its own and the org's. <strong>Members</strong> are everyone in the org: people,
+          guests (people with roles only on projects, from a project invite), and service accounts.
+        </p>
+        <p>
+          <strong>Invites</strong> are links to this app's <code>/login?invite=</code>. The token stays in the
+          browser while you sign in, then <code>POST /user/invites/redeem</code> joins you and names where to go.
+          Plat5 sends no email. <strong>Service accounts</strong> are members for machines, with roles and keys of
+          their own.
+        </p>
+      </Section>
 
-        <Section title="User keys">
-          <p>
-            <code>GET/POST /user/api-keys</code> with your sign-in. A user key is sent as <code>X-API-Key</code>{" "}
-            and admitted on user routes (<code>/user/…</code>) only. On an organization or member route it is{" "}
-            <code>401</code>: those take a member key or member session. Member keys look the same; the prefix
-            says it's a key, not whose.
-          </p>
-        </Section>
+      <Section title="Deleting is soft">
+        <p>
+          A deleted org or project can be restored until its <code>purge_after</code>: <code>?status=deleted</code>{" "}
+          lists them, <code>POST …/restore</code> brings one back with everything in it.
+        </p>
+      </Section>
 
-        <Section title="Try it: which key works where">
-          <p>
-            Calls the gateway with only <code>X-API-Key</code>, no user JWT. User keys are admitted on user
-            routes; member keys and member sessions on organization and member routes. The wrong kind is{" "}
-            <code>401</code>, and the message says what the route takes.
-          </p>
-          <KeyProbe />
-        </Section>
+      <Section title="Audit">
+        <p>
+          The gateway records every write: who, where, and how it ended; your API adds what changed with{" "}
+          <code>X-Plat5-Audit-Details</code>. An org's log is <code>GET /orgs/{"{organization}"}/audit-events</code>,
+          a project's is under it, and yours is <code>GET /user/audit-events</code>.
+        </p>
+      </Section>
 
-        <Section title="Try it: another org">
-          <p>
-            <code>POST /user/organizations/{"{id}"}/session</code> with your sign-in. Not an active member is{" "}
-            <strong>404</strong>, the same as an org that doesn't exist.
-          </p>
-          <OrgProbe />
-        </Section>
+      <Section title="Try it: a key">
+        <p>
+          Calls the gateway with only the key you paste, as <code>Authorization: Bearer</code>.
+        </p>
+        <KeyProbe />
+      </Section>
 
-        <Section title="Local setup">
-          <ul>
-            <li>
-              Auth on <code>{config.authIssuer}</code> with redirect <code>{config.authRedirectUri}</code> allowed
-            </li>
-            <li>
-              Plat5 gateway on <code>{config.gatewayUrl}</code>
-            </li>
-            <li>
-              Your API behind the gateway, with routes applied (<code>plat5 start</code> does both)
-            </li>
-          </ul>
-        </Section>
+      <Section title="Try it: another org">
+        <p>
+          <code>GET /orgs/{"{organization}"}</code> with your sign-in. Not a member, or no such org: the same{" "}
+          <code>403</code>.
+        </p>
+        <OrgProbe />
+      </Section>
+
+      <Section title="Local setup">
+        <ul>
+          <li>
+            Auth on <code>{config.authIssuer}</code> with redirect <code>{config.authRedirectUri}</code> allowed
+          </li>
+          <li>
+            Plat5 gateway on <code>{config.gatewayUrl}</code>
+          </li>
+          <li>
+            Your API behind the gateway, with <code>plat5.yml</code> applied (<code>plat5 start</code> does both)
+          </li>
+        </ul>
+      </Section>
     </div>
   )
 }

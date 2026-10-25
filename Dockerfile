@@ -1,6 +1,6 @@
 # The customer console behind nginx on :8080. Settings come from the container's
 # environment at start (docker/config.sh), not the build: GATEWAY_URL, AUTH_ISSUER,
-# AUTH_CLIENT_ID, AUTH_REDIRECT_URI, AUTH_AUDIENCE, AUTH_USER_ID_CLAIM. Unset ones
+# AUTH_CLIENT_ID, AUTH_REDIRECT_URI, AUTH_AUDIENCE, AUTH_SUBJECT_CLAIM. Unset ones
 # fall back to the local defaults `plat5 start` uses.
 # dev: the Vite dev server on :3001, with this directory mounted over /app
 # (docker-compose.yml). Edits reload in the browser. Its node_modules is a volume,

@@ -1,8 +1,8 @@
-import type { ApiKeyListed } from "../api/types"
+import type { Key } from "../api/types"
 import { Status } from "./ui"
 
 /** One API key in a list: name, prefix, dates, and Revoke while it works. */
-export function KeyRow({ k, onRevoke }: { k: ApiKeyListed; onRevoke: () => void }) {
+export function KeyRow({ k, onRevoke }: { k: Key; onRevoke: () => void }) {
   return (
     <div className="list-item">
       <div>

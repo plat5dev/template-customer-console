@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { Navigate, useLocation } from "react-router-dom"
 import { api } from "../api/endpoints"
+import { nodeHome } from "../api/tree"
 import { useAuth } from "../auth/AuthContext"
 import {
   captureInviteQuery,
@@ -17,7 +18,7 @@ export function LoginPage() {
   const { ready, authenticated, login } = useAuth()
   const location = useLocation()
   const from =
-    (location.state as { from?: string } | null)?.from || "/profile"
+    (location.state as { from?: string } | null)?.from || "/user"
   const [error, setError] = useState<unknown>(null)
   const [joining, setJoining] = useState(false)
   const [pendingInvite, setPendingInvite] = useState(
@@ -37,9 +38,9 @@ export function LoginPage() {
       setJoining(true)
       void (async () => {
         try {
-          await api.redeemInvite(token)
+          const { node } = await api.redeemInvite(token)
           clearStashedInvite()
-          window.location.replace("/orgs")
+          window.location.replace(nodeHome(node))
         } catch (e: unknown) {
           inviteRedeemStarted = null
           setJoining(false)
@@ -69,7 +70,7 @@ export function LoginPage() {
 
   if (joining) {
     return (
-      <div className="loading-page">Joining organization…</div>
+      <div className="loading-page">Accepting invite…</div>
     )
   }
 
@@ -78,12 +79,12 @@ export function LoginPage() {
       <div className="card">
         <div className="card-body">
           <h1 className="section-title" style={{ fontSize: "1.25rem" }}>
-            {pendingInvite ? "Join organization" : "Sign in"}
+            {pendingInvite ? "Accept invite" : "Sign in"}
           </h1>
           <ErrorAlert error={error} onDismiss={() => setError(null)} />
           <p className="section-lede">
             {pendingInvite
-              ? "You've been invited to an organization. Sign in, or create an account, and you'll join it."
+              ? "You've been invited. Sign in, or create an account, and you'll join."
               : "Sign in, or create an account, to continue."}
           </p>
           <button
@@ -96,9 +97,9 @@ export function LoginPage() {
                 setJoining(true)
                 void (async () => {
                   try {
-                    await api.redeemInvite(token)
+                    const { node } = await api.redeemInvite(token)
                     clearStashedInvite()
-                    window.location.replace("/orgs")
+                    window.location.replace(nodeHome(node))
                   } catch (e: unknown) {
                     setJoining(false)
                     setError(e)
@@ -109,7 +110,7 @@ export function LoginPage() {
               void login(pendingInvite ? "/orgs" : from)
             }}
           >
-            {pendingInvite && authenticated ? "Retry join" : "Continue to sign-in"}
+            {pendingInvite && authenticated ? "Retry" : "Continue to sign-in"}
           </button>
         </div>
       </div>

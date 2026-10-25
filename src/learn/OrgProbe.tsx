@@ -3,46 +3,28 @@ import { api } from "../api/endpoints"
 import { ApiError } from "../api/client"
 import { ErrorAlert } from "../components/ErrorAlert"
 
-/** Ask for a member session in any org by id. Only an active member gets one. */
+/** Ask for any org by slug. Only someone who may read it gets an answer. */
 export function OrgProbe() {
-  const [orgId, setOrgId] = useState("")
+  const [org, setOrg] = useState("")
   const [probing, setProbing] = useState(false)
   const [result, setResult] = useState<string | null>(null)
   const [error, setError] = useState<unknown>(null)
 
   async function onProbe(e: FormEvent) {
     e.preventDefault()
-    const id = orgId.trim()
-    if (!id) return
+    const slug = org.trim()
+    if (!slug) return
     setProbing(true)
     setResult(null)
     setError(null)
-    const path = `POST /user/organizations/${id}/session`
+    const path = `/orgs/${slug}`
     try {
-      const minted = await api.createMemberSession(id)
-      setResult(
-        [
-          path,
-          "HTTP 201",
-          "Member session. Send as X-API-Key on organization and member routes.",
-          "This probe does not replace the app session, and does not call /org with the user JWT.",
-          minted.token,
-          `member_id=${minted.member_id}`,
-          `organization_id=${minted.organization_id}`,
-          `expires_at=${minted.expires_at}`,
-        ].join("\n"),
-      )
+      const node = await api.getNode(path)
+      setResult([`GET ${path}`, "HTTP 200", JSON.stringify(node, null, 2)].join("\n"))
     } catch (err) {
       if (err instanceof ApiError) {
         setResult(
-          [
-            path,
-            `HTTP ${err.status} ${err.code}`,
-            err.message,
-            err.requestId ? `request_id=${err.requestId}` : null,
-            "",
-            err.status === 404 ? "Not an active member. Organization routes are not called with the user JWT." : null,
-          ]
+          [`GET ${path}`, `HTTP ${err.status} ${err.code}`, err.message, err.body ? JSON.stringify(err.body, null, 2) : null]
             .filter((line) => line !== null)
             .join("\n"),
         )
@@ -59,20 +41,20 @@ export function OrgProbe() {
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
       <form className="inset" onSubmit={(e) => void onProbe(e)}>
         <div className="field">
-          <label htmlFor="probe_org">Organization ID</label>
+          <label htmlFor="probe_org">Organization slug</label>
           <input
             id="probe_org"
             className="input mono"
-            value={orgId}
-            onChange={(e) => setOrgId(e.target.value)}
-            placeholder="another org id or random ULID"
+            value={org}
+            onChange={(e) => setOrg(e.target.value)}
+            placeholder="acme"
             required
           />
-          <span className="hint">Tip: create a second org, copy its id, and try it here.</span>
+          <span className="hint">Try one of yours, one you're not in, and one that doesn't exist.</span>
         </div>
         <div>
-          <button type="submit" className="btn" disabled={probing || !orgId.trim()}>
-            {probing ? "Probing…" : "Mint session"}
+          <button type="submit" className="btn" disabled={probing || !org.trim()}>
+            {probing ? "Asking…" : "Get org"}
           </button>
         </div>
       </form>

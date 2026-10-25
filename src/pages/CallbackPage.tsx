@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { api } from "../api/endpoints"
+import { nodeHome } from "../api/tree"
 import {
   clearStashedInvite,
   completeLogin,
@@ -23,14 +24,10 @@ export function CallbackPage() {
         const token = peekStashedInvite(oauthState)
         const returnTo = await completeLogin(window.location.search)
         if (token) {
-          try {
-            await api.redeemInvite(token)
-          } catch (e: unknown) {
-            // Keep cookie + by-state stash so the user can retry.
-            throw e
-          }
+          // On failure the cookie and by-state stash stay, so the person can retry.
+          const { node } = await api.redeemInvite(token)
           clearStashedInvite(oauthState)
-          window.location.replace("/orgs")
+          window.location.replace(nodeHome(node))
           return
         }
         window.location.replace(returnTo || "/")

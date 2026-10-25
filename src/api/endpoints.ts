@@ -1,18 +1,17 @@
-import { apiFetch, type FetchAuth } from "./client"
+import { apiFetch, listAll } from "./client"
 import type {
-  ApiKeyCreated,
   AuditEvent,
-  ApiKeyListed,
-  CreateApiKeyBody,
+  Binding,
+  CreatedInvite,
+  CreatedKey,
   CreateInviteBody,
   Invite,
+  Key,
   Member,
-  MemberPatchStatus,
-  MemberSession,
   Membership,
-  Organization,
+  Node,
   Profile,
-  Project,
+  Redeemed,
   RolesList,
   ServiceAccount,
   Task,
@@ -20,373 +19,103 @@ import type {
   User,
 } from "./types"
 
-/** Organization and member routes take a member session or member key. Not a user JWT. */
-function memberAuth(apiKey: string): FetchAuth {
-  return { mode: "api-key", apiKey }
+// Every call the app makes, through the gateway with the person's sign-in token.
+// A node is addressed by its path, by slug: `/orgs/acme`, `/orgs/acme/projects/web`.
+
+function send(method: string, body?: unknown): RequestInit {
+  return body === undefined ? { method } : { method, body: JSON.stringify(body) }
 }
 
-function enc(segment: string): string {
-  return encodeURIComponent(segment)
+type AuditPage = { audit_events: AuditEvent[]; has_more: boolean }
+
+function auditPage(path: string, startingAfter?: string) {
+  const q = new URLSearchParams({ limit: "25" })
+  if (startingAfter) q.set("starting_after", startingAfter)
+  return apiFetch<AuditPage>(`${path}?${q}`)
 }
 
 export const api = {
-  /** The signed-in person (identity's directory). */
+  // The person: user routes.
   getUser: () => apiFetch<User>("/user"),
-
-  /** `display_name: null` clears it. */
-  updateUser: (body: { display_name: string | null }) =>
-    apiFetch<User>("/user", {
-      method: "PATCH",
-      body: JSON.stringify(body),
-    }),
-
-  /** 409 ORGANIZATION_HANDOFF_REQUIRED while the last member of an org. */
-  deleteUser: () => apiFetch<void>("/user", { method: "DELETE" }),
-
-  /** The person's own audit log. Needs the audit catalog applied. */
-  listUserAuditEvents: async (limit = 20) => {
-    const data = await apiFetch<{ audit_events: AuditEvent[]; has_more: boolean }>(
-      `/user/audit-events?limit=${limit}`,
-    )
-    return data.audit_events ?? []
-  },
-
+  deleteUser: () => apiFetch<void>("/user", send("DELETE")),
+  /** The nodes of a kind the person can see, across every tree. `deleted` lists deleted ones. */
+  listMyNodes: (kind: string, deleted = false) =>
+    listAll<Node>(`/user/nodes?kind=${kind}${deleted ? "&status=deleted" : ""}`, "nodes"),
+  listMyKeys: () => listAll<Key>("/user/keys", "keys"),
+  createMyKey: (name: string) => apiFetch<CreatedKey>("/user/keys", send("POST", name ? { name } : {})),
+  revokeMyKey: (keyId: string) => apiFetch<void>(`/user/keys/${keyId}`, send("DELETE")),
+  redeemInvite: (token: string) => apiFetch<Redeemed>("/user/invites/redeem", send("POST", { token })),
+  listMyAuditEvents: (startingAfter?: string) => auditPage("/user/audit-events", startingAfter),
   getProfile: () => apiFetch<Profile>("/user/profile"),
+  putProfile: (bio: string) => apiFetch<Profile>("/user/profile", send("PUT", { bio })),
 
-  putProfile: (body: { bio: string }) =>
-    apiFetch<Profile>("/user/profile", {
-      method: "PUT",
-      body: JSON.stringify(body),
-    }),
+  // Nodes.
+  createOrg: (displayName: string) => apiFetch<Node>("/orgs", send("POST", { display_name: displayName })),
+  getNode: (path: string) => apiFetch<Node>(path),
+  renameNode: (path: string, displayName: string) =>
+    apiFetch<Node>(path, send("PATCH", { display_name: displayName })),
+  deleteNode: (path: string) => apiFetch<void>(path, send("DELETE")),
+  restoreNode: (path: string) => apiFetch<Node>(`${path}/restore`, send("POST")),
+  /** The children of a kind the caller can see: `listChildren("/orgs/acme", "projects")`. */
+  listChildren: (path: string, collection: string, deleted = false) =>
+    listAll<Node>(`${path}/${collection}${deleted ? "?status=deleted" : ""}`, "nodes"),
+  createChild: (path: string, collection: string, displayName: string) =>
+    apiFetch<Node>(`${path}/${collection}`, send("POST", { display_name: displayName })),
 
-  listMemberships: async () => {
-    const data = await apiFetch<{
-      memberships: Membership[]
-      has_more: boolean
-    }>("/user/memberships")
-    return data.memberships ?? []
-  },
+  // What the caller holds, and who has access.
+  getMembership: (path: string) => apiFetch<Membership>(`${path}/membership`),
+  /** Leave the tree: on a root only. */
+  leave: (rootPath: string) => apiFetch<void>(`${rootPath}/membership`, send("DELETE")),
+  listRoles: (path: string) => apiFetch<RolesList>(`${path}/roles`),
+  listBindings: (path: string) => listAll<Binding>(`${path}/bindings`, "bindings"),
+  createBinding: (path: string, memberId: string, role: string) =>
+    apiFetch<Binding>(`${path}/bindings`, send("POST", { member_id: memberId, role })),
+  updateBinding: (path: string, bindingId: string, role: string) =>
+    apiFetch<Binding>(`${path}/bindings/${bindingId}`, send("PATCH", { role })),
+  deleteBinding: (path: string, bindingId: string) =>
+    apiFetch<void>(`${path}/bindings/${bindingId}`, send("DELETE")),
 
-  createOrganization: (body: { name: string }) =>
-    apiFetch<Organization>("/user/organizations", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+  // Members: on a root.
+  listMembers: (rootPath: string) => listAll<Member>(`${rootPath}/members`, "members"),
+  getMember: (rootPath: string, memberId: string) => apiFetch<Member>(`${rootPath}/members/${memberId}`),
+  /** The person is named by IdP issuer and subject, and created if the subject is new. */
+  addMember: (rootPath: string, idp: { issuer: string; subject: string }, role: string) =>
+    apiFetch<Member>(`${rootPath}/members`, send("POST", { idp, role })),
+  removeMember: (rootPath: string, memberId: string) =>
+    apiFetch<void>(`${rootPath}/members/${memberId}`, send("DELETE")),
 
-  /**
-   * User JWT or user API key. No body. 201 `{ token, expires_at, member_id, organization_id, role, labels }`.
-   * `labels` is the member's role labels at mint.
-   * Not an active member → 404. Do not follow a 404 with `/org` on the user JWT.
-   */
-  createMemberSession: (organizationId: string) =>
-    apiFetch<MemberSession>(
-      `/user/organizations/${enc(organizationId)}/session`,
-      { method: "POST" },
-    ),
+  // Service accounts born at a node, and their keys.
+  listServiceAccounts: (path: string) => listAll<ServiceAccount>(`${path}/service-accounts`, "service_accounts"),
+  createServiceAccount: (path: string, name: string, role: string) =>
+    apiFetch<ServiceAccount>(`${path}/service-accounts`, send("POST", { name, role })),
+  renameServiceAccount: (path: string, id: string, name: string) =>
+    apiFetch<ServiceAccount>(`${path}/service-accounts/${id}`, send("PATCH", { name })),
+  deleteServiceAccount: (path: string, id: string) =>
+    apiFetch<void>(`${path}/service-accounts/${id}`, send("DELETE")),
+  listServiceAccountKeys: (path: string, id: string) => listAll<Key>(`${path}/service-accounts/${id}/keys`, "keys"),
+  createServiceAccountKey: (path: string, id: string, name: string) =>
+    apiFetch<CreatedKey>(`${path}/service-accounts/${id}/keys`, send("POST", name ? { name } : {})),
+  revokeServiceAccountKey: (path: string, id: string, keyId: string) =>
+    apiFetch<void>(`${path}/service-accounts/${id}/keys/${keyId}`, send("DELETE")),
 
-  listUserApiKeys: async () => {
-    const data = await apiFetch<{ keys: ApiKeyListed[]; has_more: boolean }>(
-      "/user/api-keys",
-    )
-    return data.keys ?? []
-  },
+  // Invites to a node.
+  listInvites: (path: string) => listAll<Invite>(`${path}/invites`, "invites"),
+  createInvite: (path: string, body: CreateInviteBody) =>
+    apiFetch<CreatedInvite>(`${path}/invites`, send("POST", body)),
+  revokeInvite: (path: string, inviteId: string) => apiFetch<void>(`${path}/invites/${inviteId}`, send("DELETE")),
 
-  createUserApiKey: (body: CreateApiKeyBody) =>
-    apiFetch<ApiKeyCreated>("/user/api-keys", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+  /** A node's log, and everything below it, newest first. */
+  listAuditEvents: (path: string, startingAfter?: string) => auditPage(`${path}/audit-events`, startingAfter),
 
-  deleteUserApiKey: (keyId: string) =>
-    apiFetch<void>(`/user/api-keys/${enc(keyId)}`, { method: "DELETE" }),
+  // Your API: tasks inside a project.
+  listTasks: (projectPath: string) => listAll<Task>(`${projectPath}/tasks`, "tasks"),
+  createTask: (projectPath: string, title: string) =>
+    apiFetch<Task>(`${projectPath}/tasks`, send("POST", { title })),
+  updateTask: (projectPath: string, taskId: string, body: { title?: string; status?: TaskStatus }) =>
+    apiFetch<Task>(`${projectPath}/tasks/${taskId}`, send("PATCH", body)),
+  deleteTask: (projectPath: string, taskId: string) =>
+    apiFetch<void>(`${projectPath}/tasks/${taskId}`, send("DELETE")),
 
-  /** User JWT. Body is `{ token }` only. */
-  redeemInvite: (token: string) =>
-    apiFetch<Member>("/user/invites/redeem", {
-      method: "POST",
-      body: JSON.stringify({ token }),
-    }),
-
-  getOrg: (sessionToken: string) =>
-    apiFetch<Organization>("/org", { auth: memberAuth(sessionToken) }),
-
-  updateOrg: (
-    sessionToken: string,
-    body: { name?: string },
-  ) =>
-    apiFetch<Organization>("/org", {
-      method: "PATCH",
-      auth: memberAuth(sessionToken),
-      body: JSON.stringify(body),
-    }),
-
-  deleteOrg: (sessionToken: string) =>
-    apiFetch<void>("/org", {
-      method: "DELETE",
-      auth: memberAuth(sessionToken),
-    }),
-
-  listMembers: async (sessionToken: string) => {
-    const data = await apiFetch<{ members: Member[]; has_more: boolean }>(
-      "/org/members",
-      { auth: memberAuth(sessionToken) },
-    )
-    return data.members ?? []
-  },
-
-  /** The deployment's roles. Same list for every org today. */
-  listRoles: (sessionToken: string) =>
-    apiFetch<RolesList>("/org/roles", { auth: memberAuth(sessionToken) }),
-
-  /** The person is named by IdP issuer and subject, never by user id. */
-  createMember: (
-    sessionToken: string,
-    body: { idp: { issuer: string; subject: string }; role?: string },
-  ) =>
-    apiFetch<Member>("/org/members", {
-      method: "POST",
-      auth: memberAuth(sessionToken),
-      body: JSON.stringify(body),
-    }),
-
-  /** The org's audit log, newest first. Needs org:audit:read and the audit catalog. */
-  listOrgAuditEvents: (sessionToken: string, limit = 25, startingAfter?: string) => {
-    const q = new URLSearchParams({ limit: String(limit) })
-    if (startingAfter) q.set("starting_after", startingAfter)
-    return apiFetch<{ audit_events: AuditEvent[]; has_more: boolean }>(
-      `/org/audit-events?${q}`,
-      { auth: memberAuth(sessionToken) },
-    )
-  },
-
-  listInvites: async (sessionToken: string) => {
-    const data = await apiFetch<{ invites: Invite[]; has_more: boolean }>(
-      "/org/invites",
-      { auth: memberAuth(sessionToken) },
-    )
-    return data.invites ?? []
-  },
-
-  createInvite: (sessionToken: string, body?: CreateInviteBody) =>
-    apiFetch<Invite>("/org/invites", {
-      method: "POST",
-      auth: memberAuth(sessionToken),
-      body: JSON.stringify(body ?? {}),
-    }),
-
-  /**
-   * The org acting on one of its members (not yourself: that is `/member`).
-   * The caller must hold every label of the member's current role and of a new role.
-   */
-  updateOrgMember: (
-    sessionToken: string,
-    memberId: string,
-    body: { status?: MemberPatchStatus; role?: string },
-  ) =>
-    apiFetch<Member>(`/org/members/${enc(memberId)}`, {
-      method: "PATCH",
-      auth: memberAuth(sessionToken),
-      body: JSON.stringify(body),
-    }),
-
-  removeOrgMember: (sessionToken: string, memberId: string) =>
-    apiFetch<void>(`/org/members/${enc(memberId)}`, {
-      method: "DELETE",
-      auth: memberAuth(sessionToken),
-    }),
-
-  revokeInvite: (sessionToken: string, inviteId: string) =>
-    apiFetch<void>(`/org/invites/${enc(inviteId)}`, {
-      method: "DELETE",
-      auth: memberAuth(sessionToken),
-    }),
-
-  listServiceAccounts: async (sessionToken: string) => {
-    const data = await apiFetch<{
-      service_accounts: ServiceAccount[]
-      has_more: boolean
-    }>("/org/service-accounts", { auth: memberAuth(sessionToken) })
-    return data.service_accounts ?? []
-  },
-
-  createServiceAccount: (
-    sessionToken: string,
-    body: { name: string; role?: string },
-  ) =>
-    apiFetch<ServiceAccount>("/org/service-accounts", {
-      method: "POST",
-      auth: memberAuth(sessionToken),
-      body: JSON.stringify(body),
-    }),
-
-  deleteServiceAccount: (sessionToken: string, serviceAccountId: string) =>
-    apiFetch<void>(`/org/service-accounts/${enc(serviceAccountId)}`, {
-      method: "DELETE",
-      auth: memberAuth(sessionToken),
-    }),
-
-  /** Member keys for that service account. Same rows as its member self-address. */
-  listServiceAccountApiKeys: async (
-    sessionToken: string,
-    serviceAccountId: string,
-  ) => {
-    const data = await apiFetch<{ keys: ApiKeyListed[]; has_more: boolean }>(
-      `/org/service-accounts/${enc(serviceAccountId)}/api-keys`,
-      { auth: memberAuth(sessionToken) },
-    )
-    return data.keys ?? []
-  },
-
-  createServiceAccountApiKey: (
-    sessionToken: string,
-    serviceAccountId: string,
-    body: CreateApiKeyBody,
-  ) =>
-    apiFetch<ApiKeyCreated>(
-      `/org/service-accounts/${enc(serviceAccountId)}/api-keys`,
-      {
-        method: "POST",
-        auth: memberAuth(sessionToken),
-        body: JSON.stringify(body),
-      },
-    ),
-
-  deleteServiceAccountApiKey: (
-    sessionToken: string,
-    serviceAccountId: string,
-    keyId: string,
-  ) =>
-    apiFetch<void>(
-      `/org/service-accounts/${enc(serviceAccountId)}/api-keys/${enc(keyId)}`,
-      { method: "DELETE", auth: memberAuth(sessionToken) },
-    ),
-
-  /** Acts on the credential's member only. */
-  getMember: (sessionToken: string) =>
-    apiFetch<Member>("/member", { auth: memberAuth(sessionToken) }),
-
-  /** `display_name` is this org's override; `null` clears it. */
-  updateMember: (
-    sessionToken: string,
-    body: { status?: MemberPatchStatus; display_name?: string | null },
-  ) =>
-    apiFetch<Member>("/member", {
-      method: "PATCH",
-      auth: memberAuth(sessionToken),
-      body: JSON.stringify(body),
-    }),
-
-  deleteMember: (sessionToken: string) =>
-    apiFetch<void>("/member", {
-      method: "DELETE",
-      auth: memberAuth(sessionToken),
-    }),
-
-  listMemberApiKeys: async (sessionToken: string) => {
-    const data = await apiFetch<{ keys: ApiKeyListed[]; has_more: boolean }>(
-      "/member/api-keys",
-      { auth: memberAuth(sessionToken) },
-    )
-    return data.keys ?? []
-  },
-
-  createMemberApiKey: (sessionToken: string, body: CreateApiKeyBody) =>
-    apiFetch<ApiKeyCreated>("/member/api-keys", {
-      method: "POST",
-      auth: memberAuth(sessionToken),
-      body: JSON.stringify(body),
-    }),
-
-  deleteMemberApiKey: (sessionToken: string, keyId: string) =>
-    apiFetch<void>(`/member/api-keys/${enc(keyId)}`, {
-      method: "DELETE",
-      auth: memberAuth(sessionToken),
-    }),
-
-  listProjects: async (sessionToken: string) => {
-    const data = await apiFetch<{ projects: Project[] }>(
-      "/org/projects",
-      { auth: memberAuth(sessionToken) },
-    )
-    return data.projects ?? []
-  },
-
-  createProject: (
-    sessionToken: string,
-    body: { name: string; description?: string },
-  ) =>
-    apiFetch<Project>("/org/projects", {
-      method: "POST",
-      auth: memberAuth(sessionToken),
-      body: JSON.stringify(body),
-    }),
-
-  getProject: (sessionToken: string, projectId: string) =>
-    apiFetch<Project>(`/org/projects/${enc(projectId)}`, {
-      auth: memberAuth(sessionToken),
-    }),
-
-  updateProject: (
-    sessionToken: string,
-    projectId: string,
-    body: { name?: string; description?: string },
-  ) =>
-    apiFetch<Project>(`/org/projects/${enc(projectId)}`, {
-      method: "PATCH",
-      auth: memberAuth(sessionToken),
-      body: JSON.stringify(body),
-    }),
-
-  deleteProject: (sessionToken: string, projectId: string) =>
-    apiFetch<void>(`/org/projects/${enc(projectId)}`, {
-      method: "DELETE",
-      auth: memberAuth(sessionToken),
-    }),
-
-  listTasks: async (sessionToken: string, projectId: string) => {
-    const data = await apiFetch<{ tasks: Task[] }>(
-      `/org/projects/${enc(projectId)}/tasks`,
-      { auth: memberAuth(sessionToken) },
-    )
-    return data.tasks ?? []
-  },
-
-  createTask: (
-    sessionToken: string,
-    projectId: string,
-    body: { title: string; status?: TaskStatus },
-  ) =>
-    apiFetch<Task>(`/org/projects/${enc(projectId)}/tasks`, {
-      method: "POST",
-      auth: memberAuth(sessionToken),
-      body: JSON.stringify(body),
-    }),
-
-  updateTask: (
-    sessionToken: string,
-    projectId: string,
-    taskId: string,
-    body: { title?: string; status?: TaskStatus },
-  ) =>
-    apiFetch<Task>(
-      `/org/projects/${enc(projectId)}/tasks/${enc(taskId)}`,
-      {
-        method: "PATCH",
-        auth: memberAuth(sessionToken),
-        body: JSON.stringify(body),
-      },
-    ),
-
-  deleteTask: (sessionToken: string, projectId: string, taskId: string) =>
-    apiFetch<void>(
-      `/org/projects/${enc(projectId)}/tasks/${enc(taskId)}`,
-      {
-        method: "DELETE",
-        auth: memberAuth(sessionToken),
-      },
-    ),
-
-  /** Call any gateway path with explicit auth (for API key try-it). */
-  probe: <T>(path: string, auth?: FetchAuth) =>
-    apiFetch<T>(path, auth ? { auth } : {}),
+  /** Any gateway path, with a credential other than the sign-in (the Learn page's probes). */
+  probe: <T>(path: string, bearer?: string) => apiFetch<T>(path, bearer ? { bearer } : {}),
 }

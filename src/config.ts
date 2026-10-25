@@ -7,7 +7,7 @@ type Settings = {
   authClientId?: string
   authRedirectUri?: string
   authAudience?: string
-  authUserIdClaim?: string
+  authSubjectClaim?: string
 }
 
 const runtime: Settings = (window as { __PLAT5_WEB_CONFIG__?: Settings }).__PLAT5_WEB_CONFIG__ ?? {}
@@ -26,6 +26,6 @@ export const config = {
   authClientId: setting("authClientId", "VITE_AUTH_CLIENT_ID", "plat5"),
   authRedirectUri: setting("authRedirectUri", "VITE_AUTH_REDIRECT_URI", `${window.location.origin}/callback`),
   authAudience: setting("authAudience", "VITE_AUTH_AUDIENCE", "") || undefined,
-  /** Same claim path as the gateway's AUTH_USER_ID_CLAIM. */
-  authUserIdClaim: setting("authUserIdClaim", "VITE_AUTH_USER_ID_CLAIM", "properties.user_id"),
+  /** Same claim path as the gateway's AUTH_SUBJECT_CLAIM. */
+  authSubjectClaim: setting("authSubjectClaim", "VITE_AUTH_SUBJECT_CLAIM", "properties.user_id"),
 } as const

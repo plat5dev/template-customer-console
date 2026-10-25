@@ -1,3 +1,6 @@
+// The shapes this app reads, from Plat5's identity and audit APIs and from your API.
+// Ids are lowercase ULIDs: opaque strings here.
+
 export type ApiErrorBody = {
   error: {
     type: string
@@ -8,17 +11,16 @@ export type ApiErrorBody = {
   }
 }
 
-/** The signed-in person in the directory (`GET /user`). */
+export type Principal = "person" | "service_account"
+
+/** The signed-in person (`GET /user`). The name comes from the IdP's name claim. */
 export type User = {
   id: string
-  /** The person's name everywhere an org has no override. */
-  display_name: string | null
+  name: string | null
   status: "active" | "suspended"
-  created_at: string
-  updated_at: string
 }
 
-/** The template service's profile: app data keyed by the person's directory id. */
+/** This app's own data about the person, on your API (`/user/profile`). */
 export type Profile = {
   user_id: string
   bio: string
@@ -26,166 +28,167 @@ export type Profile = {
   updated_at: string
 }
 
-export type OrganizationRef = {
+export type Ancestor = {
   id: string
-  name: string
+  kind: string
+  slug: string
+  display_name: string
 }
 
-export type Organization = OrganizationRef & {
+/** An organization, a project, or any other kind. `ancestors` is root first, without the node. */
+export type Node = {
+  id: string
+  kind: string
+  parent_id: string | null
+  root_id: string
+  slug: string
+  display_name: string
+  status: "active" | "deleted" | "purged"
+  deleted_at: string | null
+  /** When a deleted node is purged; it can be restored until then. */
+  purge_after: string | null
+  created_at: string
+  updated_at: string
+  ancestors: Ancestor[]
+}
+
+/** A role for a member on one node. `inherited` when it sits on an ancestor of the node listed. */
+export type Binding = {
+  id: string
+  member_id: string
+  node_id: string
+  role: string
+  inherited: boolean
+  guest: boolean
+  principal: Principal
+  name: string | null
   created_at: string
   updated_at: string
 }
 
-/** Active user membership. `id` is the member id. */
+/** What the caller holds on a node (`GET …/membership`). `*` is every permission. */
 export type Membership = {
-  id: string
-  organization: OrganizationRef
-  /** Slug from the deployment's roles document. null when roles are off. */
-  role: string | null
-  status: "active"
+  member_id: string
+  bindings: Binding[]
+  permissions: string[]
 }
-
-export type MemberStatus = "active" | "suspended" | "removed"
-
-/** `PATCH /member` accepts these only. */
-export type MemberPatchStatus = "active" | "suspended"
 
 export type Member = {
   id: string
-  organization_id: string
-  principal: "user" | "service_account"
-  service_account_id: string | null
-  /** This org's override, else the person's name, else null. A service account's name. */
-  display_name: string | null
-  role: string | null
-  status: MemberStatus
-  created_at: string
-  updated_at: string
+  principal: Principal
+  name: string | null
+  status: "active" | "removed"
+  guest: boolean
 }
 
-export type MemberSession = {
-  token: string
-  expires_at: string
-  member_id: string
-  organization_id: string
-  role: string | null
-  /**
-   * The member's role labels at mint. ["*"] = every label (also when roles are off).
-   * Use it to show or hide actions; the gateway still decides.
-   */
-  labels: string[]
-}
-
-/** A role from the deployment's roles document. `labels: ["*"]` grants every label. */
+/** A role bindable at a node, with its permissions resolved. */
 export type Role = {
   slug: string
-  labels: string[]
+  permissions: string[]
 }
 
 export type RolesList = {
   roles: Role[]
-  /** The three role fields are null when roles are off (roles is then []). */
-  creator_role: string | null
-  default_role: string | null
-  /** What a service-account create gets without a role. */
-  service_account_default_role: string | null
+  creator_role: string
 }
 
-export type Project = {
-  id: string
-  organization_id: string
-  name: string
-  description: string
-  created_at: string
-  updated_at: string
-}
-
-export type TaskStatus = "todo" | "in_progress" | "done"
-
-export type Task = {
-  id: string
-  organization_id: string
-  project_id: string
-  title: string
-  status: TaskStatus
-  created_at: string
-  updated_at: string
-}
-
+/** `id` is its member id; `node_id` is where it was born. */
 export type ServiceAccount = {
   id: string
-  organization_id: string
-  member_id: string
   name: string
-  role: string | null
-  status: MemberStatus
+  node_id: string
   created_at: string
   updated_at: string
 }
 
-export type ApiKeyListed = {
+export type Key = {
   id: string
-  key_prefix: string
   name: string
+  key_prefix: string
   created_at: string
   revoked_at: string | null
 }
 
-export type ApiKeyCreated = ApiKeyListed & {
+/** The secret is on the create answer only. */
+export type CreatedKey = Key & {
   key: string
 }
 
-/** Mint JSON. A key carries its owner's permissions; it has no labels of its own. */
-export type CreateApiKeyBody = {
-  name: string
+export type Grant = {
+  node_id: string
+  role: string
 }
 
 export type InviteStatus = "active" | "redeemed" | "revoked" | "expired"
 
-/** Invite row. `token` is present while `status` is `active`. */
 export type Invite = {
   id: string
-  organization_id: string
-  email: string | null
-  role: string | null
-  token_prefix: string
-  token?: string
-  status: InviteStatus
-  max_uses: number | null
+  node_id: string
+  role: string
+  grants: Grant[]
+  max_uses: number | "unlimited"
   use_count: number
+  status: InviteStatus
   expires_at: string
+  token_prefix: string
   created_at: string
 }
 
+/** The token is on the create answer only. */
+export type CreatedInvite = Invite & {
+  token: string
+}
+
+/** `grants` only on an invite to a root. `expires_in` is a duration: `8h`, `7d`. */
 export type CreateInviteBody = {
-  email?: string
-  /** Omit for the deployment's default_role. */
-  role?: string
-  expires_in_seconds?: number
-  max_uses?: number | null
+  role: string
+  grants?: Grant[]
+  expires_in?: string
 }
 
-/** 409 ORGANIZATION_HANDOFF_REQUIRED on `DELETE /user`. */
-export type HandoffDetails = {
-  organizations: OrganizationRef[]
+/** The person's member in the invite's tree, and the node the invite was for. */
+export type Redeemed = {
+  member_id: string
+  node: Node
 }
 
-/** One audit event: the person's log (`GET /user/audit-events`) or an org's (`GET /org/audit-events`). */
+export type TaskStatus = "todo" | "in_progress" | "done"
+
+/** Your API's task. `created_by` is the member id of whoever created it. */
+export type Task = {
+  id: string
+  project_id: string
+  title: string
+  status: TaskStatus
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+/** One audited request: a node's log (`GET …/audit-events`) or the person's (`GET /user/audit-events`). */
 export type AuditEvent = {
   id: string
   occurred_at: string
   request_id: string
-  organization_id: string | null
+  root_id: string | null
+  nodes: { kind: string; id: string }[]
   actor: {
     member_id: string | null
-    auth_type: string
-    key_prefix: string | null
+    user_id: string | null
+    principal: Principal
+    auth_type: "jwt" | "apikey"
+    key_id: string | null
   }
   service: string
   method: string
   route: string
+  params: Record<string, string>
+  ip: string
+  user_agent: string | null
   outcome: "pending" | "rejected" | "responded" | "no_response"
   status: number | null
   details: Record<string, unknown> | null
   created_id: string | null
+  named_node_ids: string[]
+  named_member_id: string | null
 }

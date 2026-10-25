@@ -1,39 +1,52 @@
-import { useState, type FormEvent } from "react"
-import { Link, useLocation } from "react-router-dom"
+import { useCallback, useEffect, useState, type FormEvent } from "react"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import { api } from "../api/endpoints"
+import { nodeHome, nodePath } from "../api/tree"
+import type { Node } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
-import { SessionError } from "../components/SessionError"
 import { initials } from "../components/initials"
-import { Loading, PageHead } from "../components/ui"
-import { useOrg } from "../org/OrgContext"
+import { Loading, PageHead, Status } from "../components/ui"
+import { useOrgs } from "../org/OrgsContext"
 
+/**
+ * The orgs you can see, a create form, the deleted ones you can restore, and
+ * the projects you reach in orgs you can't open (`GET /user/nodes?kind=project`).
+ */
 export function OrgsPage() {
-  const {
-    orgs,
-    activeOrg,
-    setActiveOrgId,
-    refresh,
-    loading,
-    error: loadError,
-    sessionError,
-    refreshSession,
-  } = useOrg()
+  const { orgs, refresh, loading, error: loadError } = useOrgs()
   const location = useLocation()
+  const navigate = useNavigate()
   const [name, setName] = useState("")
   const [creating, setCreating] = useState(false)
+  const [deleted, setDeleted] = useState<Node[]>([])
+  const [guestProjects, setGuestProjects] = useState<Node[]>([])
   const [error, setError] = useState<unknown>(null)
+
+  const loadDeleted = useCallback(async () => {
+    setDeleted(await api.listMyNodes("organization", true))
+  }, [])
+
+  useEffect(() => {
+    loadDeleted().catch(setError)
+  }, [loadDeleted])
+
+  useEffect(() => {
+    if (loading) return
+    api.listMyNodes("project").then(
+      (list) => setGuestProjects(list.filter((p) => !orgs.some((o) => o.id === p.root_id))),
+      setError,
+    )
+  }, [orgs, loading])
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
     setCreating(true)
     setError(null)
     try {
-      const org = await api.createOrganization({
-        name: name.trim(),
-      })
+      const org = await api.createOrg(name.trim())
       setName("")
       await refresh()
-      setActiveOrgId(org.id)
+      navigate(nodeHome(org))
     } catch (err) {
       setError(err)
     } finally {
@@ -41,53 +54,87 @@ export function OrgsPage() {
     }
   }
 
+  async function onRestore(org: Node) {
+    setError(null)
+    try {
+      await api.restoreNode(nodePath(org))
+      await Promise.all([refresh(), loadDeleted()])
+    } catch (err) {
+      setError(err)
+    }
+  }
+
   return (
     <>
       <PageHead
-        eyebrow="/user/memberships"
+        eyebrow="/user/nodes?kind=organization"
         title="Organizations"
-        lede="The organizations you belong to. Pick one to work in it."
+        lede="The organizations you can see. Open one to work in it."
       />
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
       <ErrorAlert error={loadError} />
-      {sessionError != null && (
-        <SessionError
-          error={sessionError}
-          onRetry={refreshSession}
-          hint="The member session was not minted. Organization routes use that session, not the user JWT."
-        />
-      )}
 
       <div className="split">
-        <section className="stack-sm">
+        <section className="stack">
           {loading ? (
             <Loading />
           ) : (
             <div className="list">
               {orgs.length === 0 && <div className="empty">No organizations yet. Create one.</div>}
-              {orgs.map((o) => {
-                const active = activeOrg?.id === o.id
-                return (
-                  <div key={o.id} className="list-item">
-                    <div className="who">
-                      <span className="avatar square">{initials(o.name)}</span>
-                      <span>
-                        <Link className="list-title" to={`/orgs/${o.id}/members`}>
-                          {o.name}
-                        </Link>
-                        <span className="sub mono">{o.id}</span>
-                      </span>
-                    </div>
-                    {active ? (
-                      <span className="badge badge-accent">active</span>
-                    ) : (
-                      <button type="button" className="btn btn-sm" onClick={() => setActiveOrgId(o.id)}>
-                        Use
-                      </button>
-                    )}
+              {orgs.map((o) => (
+                <div key={o.id} className="list-item">
+                  <div className="who">
+                    <span className="avatar square">{initials(o.display_name)}</span>
+                    <span>
+                      <Link className="list-title" to={nodeHome(o)}>
+                        {o.display_name}
+                      </Link>
+                      <span className="sub mono">{nodePath(o)}</span>
+                    </span>
                   </div>
-                )
-              })}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {guestProjects.length > 0 && (
+            <div className="stack-sm">
+              <h2 className="section-title">Other projects</h2>
+              <p className="section-lede">Projects you can reach in organizations you can't open, as a guest.</p>
+              <div className="list">
+                {guestProjects.map((p) => (
+                  <div key={p.id} className="list-item">
+                    <div>
+                      <Link className="list-title" to={nodeHome(p)}>
+                        {p.display_name}
+                      </Link>
+                      <div className="list-meta">in {p.ancestors[0]?.display_name}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {deleted.length > 0 && (
+            <div className="stack-sm">
+              <h2 className="section-title">Deleted</h2>
+              <div className="list">
+                {deleted.map((o) => (
+                  <div key={o.id} className="list-item">
+                    <div>
+                      <span className="cluster">
+                        <span className="list-title">{o.display_name}</span>
+                        <Status value="deleted" />
+                      </span>
+                      <div className="list-meta">Restorable until {new Date(o.purge_after!).toLocaleString()}</div>
+                    </div>
+                    <button type="button" className="btn btn-sm" onClick={() => void onRestore(o)}>
+                      Restore
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </section>
@@ -109,7 +156,7 @@ export function OrgsPage() {
                 placeholder="Acme"
                 autoFocus={location.hash === "#create"}
               />
-              <span className="hint">You become its first member.</span>
+              <span className="hint">You get the creator's role in it. Its slug comes from the name.</span>
             </div>
             <button type="submit" className="btn btn-primary" disabled={creating || !name.trim()}>
               {creating ? "Creating…" : "Create organization"}

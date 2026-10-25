@@ -1,17 +1,17 @@
-import { roleLabels } from "../api/roles"
 import type { Role } from "../api/types"
 
-/**
- * Picks a role from the deployment's roles. Renders nothing with roles off.
- * The empty option is value "": on a create it means "omit role" (the server
- * picks default_role).
- */
+function summary(r: Role): string {
+  if (r.permissions.includes("*")) return "every permission"
+  if (r.permissions.length === 0) return "no permissions"
+  return r.permissions.join(", ")
+}
+
+/** Picks a role bindable at the node (`GET …/roles`). Each option's title lists its permissions. */
 export function RoleSelect({
   id,
   roles,
   value,
   onChange,
-  empty,
   disabled,
   ariaLabel,
 }: {
@@ -19,11 +19,9 @@ export function RoleSelect({
   roles: Role[]
   value: string
   onChange: (role: string) => void
-  empty?: { label: string }
   disabled?: boolean
   ariaLabel?: string
 }) {
-  if (roles.length === 0) return null
   return (
     <select
       id={id}
@@ -31,13 +29,16 @@ export function RoleSelect({
       aria-label={ariaLabel ?? "Role"}
       value={value}
       disabled={disabled}
+      required
       onChange={(e) => onChange(e.target.value)}
     >
-      {empty && (
-        <option value="">{empty.label}</option>
+      {value === "" && (
+        <option value="" disabled>
+          Choose a role
+        </option>
       )}
       {roles.map((r) => (
-        <option key={r.slug} value={r.slug} title={roleLabels(r)}>
+        <option key={r.slug} value={r.slug} title={summary(r)}>
           {r.slug}
         </option>
       ))}

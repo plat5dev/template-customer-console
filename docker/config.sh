@@ -12,6 +12,6 @@ window.__PLAT5_WEB_CONFIG__ = {
   authClientId: $(js "${AUTH_CLIENT_ID:-}"),
   authRedirectUri: $(js "${AUTH_REDIRECT_URI:-}"),
   authAudience: $(js "${AUTH_AUDIENCE:-}"),
-  authUserIdClaim: $(js "${AUTH_USER_ID_CLAIM:-}"),
+  authSubjectClaim: $(js "${AUTH_SUBJECT_CLAIM:-}"),
 }
 CONFIG

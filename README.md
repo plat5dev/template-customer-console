@@ -1,8 +1,8 @@
 # Customer console
 
-Your customers' console. It talks to Plat5 through the **gateway** and signs in with **Plat5 Auth** (browser OAuth/PKCE redirect): profile, user and member API keys, organizations, members, service accounts, invite links, projects, and tasks.
+Your customers' console. It talks to Plat5 through the **gateway** and signs in with **Plat5 Auth** (browser OAuth/PKCE redirect): profile, personal API keys, organizations and projects, who has access to each, members, invite links, service accounts and their keys, audit logs, and tasks.
 
-`plat5 init` copies it into a project's `customer-console/` folder, beside the API starter. Every `template-*-api` starter implements the same API (profiles, projects, tasks), so it works with any of them. It is a starting point the project owns: change anything.
+`plat5 init` copies it into a project's `customer-console/` folder, beside the API starter. Every `template-*-api` starter implements the same API (tasks inside a project, and the person's profile), so it works with any of them. It is a starting point the project owns: change anything.
 
 Stack: Vite · React · TypeScript, with plain CSS: design tokens and a small set of components, no UI framework.
 
@@ -23,7 +23,12 @@ bun install
 bun run dev            # http://localhost:3001
 ```
 
-`:3001` is beside the API on `:3000`. The defaults match `plat5 start`: gateway `:5400`, Auth `:5401`. Auth must allow `http://localhost:3001/callback` as a redirect URI and `http://localhost:3001` as an origin; `plat5 start` sets both (`app.web` in `plat5.yml`).
+`:3001` is beside the API on `:3000`. The defaults match `plat5 start`: gateway `:5400`, Auth `:5401`. Auth must allow `http://localhost:3001/callback` as a redirect URI and `http://localhost:3001` as an origin; `plat5 start` sets both from `app.web` in `plat5.dev.yml`. The gateway must allow the origin too, in `plat5.yml`:
+
+```yaml
+cors:
+  allowed_origins: ["http://localhost:3001"]
+```
 
 ## Layout
 
@@ -31,14 +36,16 @@ bun run dev            # http://localhost:3001
 src/
   pages/        one per route (App.tsx); Layout.tsx is the sidebar
   styles/       tokens.css (colors, type, the accent) and ui.css (components)
-  api/          endpoints.ts: every call, user and org routes
-  auth/         sign-in (PKCE), the user token
-  org/          the active org, and its member session
+  api/          endpoints.ts: every call; tree.ts: the kinds, paths and default permissions
+  auth/         sign-in (PKCE), the token, the pending invite
+  org/          the org switcher's list, and the node in view (NodeScope)
   components/   panels the pages share
-  learn/        the "How it works" page: how Plat5 does each page, and two probes
+  learn/        the "How it works" page, and two probes
 ```
 
-To add a page: a file in `src/pages/`, a route in `src/App.tsx`, a link in `src/components/Layout.tsx`. Organization routes send the member session (`listProjects` in `src/api/endpoints.ts`).
+The app's paths are the gateway's, by slug: `/user`, `/user/keys`, `/orgs/{organization}/…` and `/orgs/{organization}/projects/{project}/…`, with each section a sub-path (`members`, `bindings`, `service-accounts`, `invites`, `audit-events`, `settings`). `src/api/tree.ts` holds the kinds as `plat5.yml` declares them (`organization` at `/orgs`, `project` at `/projects`); change it with the kinds.
+
+To add a page: a file in `src/pages/`, a route in `src/App.tsx`, a link in `src/components/Layout.tsx`. A page inside an org or project reads it with `useNodeView()` (`src/org/nodeView.ts`): its path, and your membership there. `NodeScope` loads it, at each kind's level of the routes.
 
 To drop the teaching material: delete `src/learn/`, its route in `src/App.tsx`, and its link in `src/components/Layout.tsx`.
 
@@ -53,23 +60,33 @@ For production, the Dockerfile's last stage builds the app and serves it with ng
 | `AUTH_CLIENT_ID` | `VITE_AUTH_CLIENT_ID` | `plat5` |
 | `AUTH_REDIRECT_URI` | `VITE_AUTH_REDIRECT_URI` | `{window.location.origin}/callback` |
 | `AUTH_AUDIENCE` | `VITE_AUTH_AUDIENCE` | (unset) |
-| `AUTH_USER_ID_CLAIM` | `VITE_AUTH_USER_ID_CLAIM` | `properties.user_id` (the gateway's `AUTH_USER_ID_CLAIM`) |
+| `AUTH_SUBJECT_CLAIM` | `VITE_AUTH_SUBJECT_CLAIM` | `properties.user_id` (the gateway's `AUTH_SUBJECT_CLAIM`) |
 
 ## What it shows
 
-Sign in → Auth password UI (locally, the seeded `dev@example.com` / `password`; or register, with login codes in the Auth logs) → profile / user API keys / orgs (member session, members, copy-invite-link, service accounts and their keys, your member keys, session probe) / projects / tasks.
+Sign in → Auth password UI (locally, the seeded `dev@example.com` / `password`; or register, with login codes in the Auth logs) → your profile and keys, your orgs, and inside an org: projects, members, access, service accounts, invites, the audit log and settings; inside a project: tasks, and the same access pages.
 
-The browser does not send subject ids. User routes use the user JWT (`Authorization: Bearer`). Opening an org mints a member session (`POST /user/organizations/{id}/session`). Organization and member routes, including `/org/projects`, send that token as `X-API-Key`, not the user JWT. The gateway fills the subject into the path. A user JWT on those routes is 401. Not an active member → session mint 404; the app does not then call `/org`.
+**One credential.** Every call sends the person's Auth token as `Authorization: Bearer`. The same token reaches every org they're in; there are no sessions. The browser never sends ids for the caller: the gateway resolves the person from the token and the node from the path.
 
-Roles: with roles on (`roles.yml`, applied to the control plane), the org page shows your role and its labels (from the session mint), a role picker on invite, add-member, and service-account create, and role / status / remove on other members (`PATCH` / `DELETE /org/members/{id}`). Controls whose label you lack are disabled; the gateway still decides, and a 403 names the `required_labels`. With roles off, members have no role, every member holds every label, and the role controls are hidden.
+**The person.** `GET /user` is the account; the name comes from the IdP's name claim, so the app doesn't edit it. `DELETE /user` deletes the account. `/user/keys` are personal keys, sent as `Authorization: Bearer` too. `GET /user/audit-events` is the person's own log. The profile (`/user/profile`, a bio) is your API's.
 
-Invite copy-link is `{origin}/login?invite={token}`. Already signed in: redeem immediately (skip PKCE). Else the app stashes the token in a first-party cookie (`plat5_customer_console_invite`) plus an origin stash keyed by OAuth CSRF `state`, strips the query so Referer to Auth cannot leak it, starts PKCE (Auth `/authorize` does **not** get `invite=`; token never in OAuth `state`), then `POST /user/invites/redeem` with `{ "token" }` and the user JWT. Cookie/stash clear only after a successful redeem. Adding by IdP subject (shown on the Profile page) still works. Email is unbound. No SMTP.
+**Orgs.** The switcher is `GET /user/nodes?kind=organization`; each node carries its `ancestors`, and the app builds its links from them. `POST /orgs` creates one. Deleted orgs are `GET /user/nodes?kind=organization&status=deleted`, restorable until `purge_after` with `POST /orgs/{organization}/restore`. Projects in orgs the person can't open (a guest's) are `GET /user/nodes?kind=project`.
+
+**What you can do here.** Each org and project page loads `GET …/membership`: your member id (to mark "you"), your roles there (badges, and "Guest" for a guest), and your permissions. Buttons for routes your permissions don't reach are hidden or disabled; the gateway still decides. The permission names are identity's and audit's defaults, in `src/api/tree.ts`.
+
+**Projects** are `GET`/`POST /orgs/{organization}/projects` (the list walks `has_more`), renamed and deleted on the node, with `?status=deleted` and `POST …/restore`. A project's tasks are your API's.
+
+**Access** is one list, `GET …/bindings`: every binding that counts at the node, where it sits, inherited ones from the org, guests marked. `POST …/bindings` gives a member a role from `GET …/roles`; `PATCH` and `DELETE …/bindings/{binding_id}` change or remove it. **Members** is `GET /orgs/{organization}/members`; remove with `DELETE …/members/{member_id}`, leave with `DELETE /orgs/{organization}/membership`, or add a person by IdP subject (shown on their Profile page) with `POST …/members`.
+
+**Invites.** `POST …/invites` with a `role`, an expiry, and, on an org, `grants`: roles on projects, bound on redeem. A project invite brings in a guest, where the deployment allows it. The link is `{origin}/login?invite={token}`. Already signed in: the app redeems at once. Else it stashes the token in a first-party cookie (`plat5_customer_console_invite`) plus an origin stash keyed by the OAuth `state`, strips the query so the Referer to Auth can't leak it, and starts PKCE (Auth's `/authorize` never gets the token). Then `POST /user/invites/redeem` with `{ "token" }`, and the app opens the node the answer names. The stash clears only after a successful redeem. Plat5 sends no email.
+
+**Service accounts** are born at an org or project: created with a role, renamed, deleted, and their keys created (shown once) and revoked.
+
+**Errors** show `error.message`. A `403` reads "Permission denied, or it may not exist." with an "ask an admin for…" line from `details.required_permissions`; the app never says whether something exists.
 
 ## Auth notes
 
 Plat5 Auth (OpenAuth) returns **access + refresh** tokens (no `id_token`). This app uses authorization-code + **PKCE** against `/authorize` and `/token`, not a full OIDC client library.
-
-User routes send `Authorization: Bearer <access_token>`. Organization and member routes send the member session (or a member key) as `X-API-Key`. Do not send both headers on one call. The browser does not send subject ids; the gateway fills the subject into the path. User API keys cover user routes only.
 
 **JWT `iss` must match gateway `AUTH_ISSUER` exactly.**  
 `http://localhost:5401` ≠ `http://127.0.0.1:5401`. Use the same host string in:

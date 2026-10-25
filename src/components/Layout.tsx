@@ -1,24 +1,31 @@
 import { useEffect, useRef, useState } from "react"
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
-import { NamePrompt } from "./NamePrompt"
+import { Link, NavLink, Outlet, useLocation, useMatch, useNavigate } from "react-router-dom"
 import { Icon, type IconName } from "./icons"
 import { initials } from "./initials"
 import { Wordmark } from "./Wordmark"
 import { useAuth } from "../auth/AuthContext"
-import { useOrg } from "../org/OrgContext"
+import { useOrgs } from "../org/OrgsContext"
 import { config } from "../config"
 import { applyTheme, loadTheme, type Theme } from "../theme"
 
 export function Layout() {
   const { authenticated, login, logout, ready } = useAuth()
-  const { activeOrg } = useOrg()
+  const { orgs, lastOrg, setLastOrg } = useOrgs()
   // The drawer is open for the page it was opened on, so navigating closes it.
   const location = useLocation()
   const [openOn, setOpenOn] = useState<string | null>(null)
   const open = openOn === location.pathname
   const setOpen = (v: boolean) => setOpenOn(v ? location.pathname : null)
 
-  const org = activeOrg ? `/orgs/${activeOrg.id}` : null
+  // The org and project in the path, else the org opened last.
+  const urlOrg = useMatch("/orgs/:org/*")?.params.org
+  const urlProject = useMatch("/orgs/:org/projects/:project/*")?.params.project
+  useEffect(() => {
+    if (urlOrg) setLastOrg(urlOrg)
+  }, [urlOrg, setLastOrg])
+  const orgSlug = urlOrg ?? (lastOrg && orgs.some((o) => o.slug === lastOrg) ? lastOrg : null)
+  const org = orgSlug ? `/orgs/${orgSlug}` : null
+  const project = org && urlProject ? `${org}/projects/${urlProject}` : null
 
   return (
     <div className="shell" data-open={open}>
@@ -35,25 +42,38 @@ export function Layout() {
           <Brand />
         </div>
 
-        {authenticated && <OrgSwitcher />}
+        {authenticated && <OrgSwitcher current={orgSlug} />}
 
         {authenticated && (
           <nav className="nav-group" aria-label="Organization">
             <h2>organization</h2>
-            <Item to="/projects" icon="projects" disabled={!org}>Projects</Item>
+            <Item to={`${org}/projects`} icon="projects" disabled={!org} end>Projects</Item>
             <Item to={`${org}/members`} icon="members" disabled={!org}>Members</Item>
+            <Item to={`${org}/bindings`} icon="access" disabled={!org}>Access</Item>
             <Item to={`${org}/service-accounts`} icon="bots" disabled={!org}>Service accounts</Item>
             <Item to={`${org}/invites`} icon="invites" disabled={!org}>Invites</Item>
-            <Item to="/audit" icon="audit" disabled={!org}>Audit log</Item>
+            <Item to={`${org}/audit-events`} icon="audit" disabled={!org}>Audit log</Item>
             <Item to={`${org}/settings`} icon="settings" disabled={!org}>Settings</Item>
+          </nav>
+        )}
+
+        {authenticated && project && (
+          <nav className="nav-group" aria-label="Project">
+            <h2>project</h2>
+            <Item to={`${project}/tasks`} icon="projects">Tasks</Item>
+            <Item to={`${project}/bindings`} icon="access">Access</Item>
+            <Item to={`${project}/service-accounts`} icon="bots">Service accounts</Item>
+            <Item to={`${project}/invites`} icon="invites">Invites</Item>
+            <Item to={`${project}/audit-events`} icon="audit">Audit log</Item>
+            <Item to={`${project}/settings`} icon="settings">Settings</Item>
           </nav>
         )}
 
         {authenticated && (
           <nav className="nav-group" aria-label="You">
             <h2>you</h2>
-            <Item to="/profile" icon="profile">Profile</Item>
-            <Item to="/api-keys" icon="keys">API keys</Item>
+            <Item to="/user" icon="profile" end>Profile</Item>
+            <Item to="/user/keys" icon="keys">API keys</Item>
             <Item to="/orgs" icon="orgs" end>Organizations</Item>
           </nav>
         )}
@@ -83,7 +103,6 @@ export function Layout() {
 
       <main className="main">
         <div className="content">
-          <NamePrompt />
           <Outlet />
         </div>
       </main>
@@ -129,9 +148,9 @@ function Item({
   )
 }
 
-/** The active organization, and a menu to switch, list, or create one. */
-function OrgSwitcher() {
-  const { orgs, activeOrg, setActiveOrgId, loading } = useOrg()
+/** The org in view, and a menu to switch, list, or create one. */
+function OrgSwitcher({ current }: { current: string | null }) {
+  const { orgs, loading } = useOrgs()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
@@ -152,13 +171,14 @@ function OrgSwitcher() {
     }
   }, [open])
 
-  function pick(id: string) {
-    setActiveOrgId(id)
+  function pick(slug: string) {
     setOpen(false)
-    navigate("/projects")
+    navigate(`/orgs/${slug}/projects`)
   }
 
-  const label = activeOrg?.name ?? (loading ? "Loading…" : orgs.length ? "Pick an organization" : "No organization")
+  const active = orgs.find((o) => o.slug === current)
+  const name = active?.display_name ?? current
+  const label = name ?? (loading ? "Loading…" : orgs.length ? "Pick an organization" : "No organization")
 
   return (
     <div className="switcher" ref={ref}>
@@ -169,10 +189,10 @@ function OrgSwitcher() {
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
-        <span className="avatar">{activeOrg ? initials(activeOrg.name).slice(0, 1) : "–"}</span>
+        <span className="avatar">{name ? initials(name).slice(0, 1) : "–"}</span>
         <span className="grow">
           <b>{label}</b>
-          <small>{activeOrg?.id ?? `${orgs.length} available`}</small>
+          <small>{current ? `/orgs/${current}` : `${orgs.length} available`}</small>
         </span>
         <span className="chevron" />
       </button>
@@ -184,10 +204,10 @@ function OrgSwitcher() {
               type="button"
               role="menuitem"
               className="menu-item"
-              aria-current={o.id === activeOrg?.id}
-              onClick={() => pick(o.id)}
+              aria-current={o.slug === current}
+              onClick={() => pick(o.slug)}
             >
-              {o.name}
+              {o.display_name}
             </button>
           ))}
           {orgs.length > 0 && <hr />}

@@ -1,37 +1,30 @@
-import { useEffect, useState, type FormEvent } from "react"
-import { Link } from "react-router-dom"
+import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { api } from "../api/endpoints"
-import type { ApiKeyCreated, ApiKeyListed } from "../api/types"
+import type { CreatedKey, Key } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { KeyRow } from "../components/KeyRow"
 import { Loading, PageHead } from "../components/ui"
-import { useOrg } from "../org/OrgContext"
 
-export function ApiKeysPage() {
-  const { activeOrg } = useOrg()
-  const [keys, setKeys] = useState<ApiKeyListed[]>([])
+/** Your personal API keys: each acts as you, in every org you're in. */
+export function UserKeysPage() {
+  const [keys, setKeys] = useState<Key[] | null>(null)
   const [name, setName] = useState("")
-  const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<unknown>(null)
-  const [created, setCreated] = useState<ApiKeyCreated | null>(null)
+  const [created, setCreated] = useState<CreatedKey | null>(null)
 
-  async function load() {
-    setLoading(true)
-    setError(null)
+  const load = useCallback(async () => {
     try {
-      setKeys(await api.listUserApiKeys())
+      setKeys(await api.listMyKeys())
     } catch (e) {
       setError(e)
       setKeys([])
-    } finally {
-      setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     void load()
-  }, [])
+  }, [load])
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
@@ -39,9 +32,8 @@ export function ApiKeysPage() {
     setError(null)
     setCreated(null)
     try {
-      const key = await api.createUserApiKey({ name: name.trim() })
+      setCreated(await api.createMyKey(name.trim()))
       setName("")
-      setCreated(key)
       await load()
     } catch (err) {
       setError(err)
@@ -54,7 +46,7 @@ export function ApiKeysPage() {
     if (!confirm("Revoke this API key?")) return
     setError(null)
     try {
-      await api.deleteUserApiKey(id)
+      await api.revokeMyKey(id)
       if (created?.id === id) setCreated(null)
       await load()
     } catch (err) {
@@ -65,15 +57,9 @@ export function ApiKeysPage() {
   return (
     <>
       <PageHead
-        eyebrow="/user/api-keys"
+        eyebrow="/user/keys"
         title="API keys"
-        lede={
-          <>
-            Keys for scripts that act as you: your profile and your organizations list. To work inside an
-            org, use a member key from{" "}
-            <Link to={activeOrg ? `/orgs/${activeOrg.id}/members` : "/orgs"}>that org's members page</Link>.
-          </>
-        }
+        lede="Keys for scripts that act as you: on your own routes, and in every org you're in, with your roles there. For less, use a service account."
       />
 
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
@@ -83,15 +69,15 @@ export function ApiKeysPage() {
           <strong>Copy now. The key is not shown again.</strong>
           <code>{created.key}</code>
           <span className="list-meta">
-            prefix <code>{created.key_prefix}</code> · id <code>{created.id}</code>
+            Send it as <code>Authorization: Bearer {created.key_prefix}…</code>, like a sign-in token.
           </span>
         </div>
       )}
 
       <div className="split">
         <section className="stack-sm">
-          <h2 className="section-title">Your user keys</h2>
-          {loading ? (
+          <h2 className="section-title">Your keys</h2>
+          {keys === null ? (
             <Loading />
           ) : (
             <div className="list">
@@ -105,7 +91,7 @@ export function ApiKeysPage() {
 
         <form className="card" onSubmit={(e) => void onCreate(e)}>
           <div className="card-head">
-            <h2>New user key</h2>
+            <h2>New key</h2>
           </div>
           <div className="card-body">
             <div className="field">
@@ -115,13 +101,12 @@ export function ApiKeysPage() {
                 className="input"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                required
                 maxLength={128}
                 placeholder="ci-bot"
               />
-              <span className="hint">A key is you: it has your permissions on user routes, like your sign-in.</span>
+              <span className="hint">Optional.</span>
             </div>
-            <button type="submit" className="btn btn-primary" disabled={creating || !name.trim()}>
+            <button type="submit" className="btn btn-primary" disabled={creating}>
               {creating ? "Creating…" : "Create key"}
             </button>
           </div>

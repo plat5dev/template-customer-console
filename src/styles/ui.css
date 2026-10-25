@@ -377,7 +377,7 @@ textarea {
   align-content: start;
 }
 
-/* A bar across the top of the shell: the staff plane's, or a notice. */
+/* A bar across the top of the shell: the operator plane's, or a notice. */
 .topbar {
   grid-column: 1 / -1;
   grid-row: 1;

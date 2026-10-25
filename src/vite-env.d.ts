@@ -6,7 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_AUTH_CLIENT_ID?: string
   readonly VITE_AUTH_REDIRECT_URI?: string
   readonly VITE_AUTH_AUDIENCE?: string
-  readonly VITE_AUTH_USER_ID_CLAIM?: string
+  readonly VITE_AUTH_SUBJECT_CLAIM?: string
 }
 
 interface ImportMeta {

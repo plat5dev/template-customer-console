@@ -1,93 +1,56 @@
-import { useEffect, useState, type FormEvent } from "react"
+import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { Link } from "react-router-dom"
 import { api } from "../api/endpoints"
-import type { MemberSession, Project } from "../api/types"
+import { nodeHome, nodePath, permission } from "../api/tree"
+import type { Node } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
-import { NoOrg } from "../components/NoOrg"
-import { SessionError } from "../components/SessionError"
-import { Loading, PageHead } from "../components/ui"
-import { useOrg } from "../org/OrgContext"
+import { NodeHead } from "../components/NodeHead"
+import { Loading, Status } from "../components/ui"
+import { useNodeView } from "../org/nodeView"
 
+/** An org's projects: the ones you can see, a create form, and the deleted ones to restore. */
 export function ProjectsPage() {
-  const {
-    activeOrg,
-    session,
-    sessionLoading,
-    sessionError,
-    refreshSession,
-  } = useOrg()
-
-  if (!activeOrg) return <NoOrg />
-  if (sessionError) {
-    return (
-      <SessionError error={sessionError} onRetry={refreshSession} hint="Projects use a member session, not the user JWT." />
-    )
-  }
-  if (sessionLoading || !session) return <Loading>Opening member session…</Loading>
-
-  return <ProjectsLoaded key={session.token} session={session} orgName={activeOrg.name} />
-}
-
-function ProjectsLoaded({
-  session,
-  orgName,
-}: {
-  session: MemberSession
-  orgName: string
-}) {
-  const [projects, setProjects] = useState<Project[]>([])
+  const org = useNodeView()
+  const [projects, setProjects] = useState<Node[] | null>(null)
+  const [deleted, setDeleted] = useState<Node[] | null>(null)
+  const [showDeleted, setShowDeleted] = useState(false)
   const [name, setName] = useState("")
-  const [description, setDescription] = useState("")
-  const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<unknown>(null)
 
-  async function load() {
-    setLoading(true)
-    setError(null)
+  const load = useCallback(async () => {
     try {
-      setProjects(await api.listProjects(session.token))
+      setProjects(await api.listChildren(org.path, "projects"))
     } catch (e) {
       setError(e)
       setProjects([])
-    } finally {
-      setLoading(false)
     }
-  }
+  }, [org.path])
+
+  const loadDeleted = useCallback(async () => {
+    try {
+      setDeleted(await api.listChildren(org.path, "projects", true))
+    } catch (e) {
+      setError(e)
+      setDeleted([])
+    }
+  }, [org.path])
 
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    void (async () => {
-      try {
-        const list = await api.listProjects(session.token)
-        if (!cancelled) setProjects(list)
-      } catch (e) {
-        if (!cancelled) {
-          setError(e)
-          setProjects([])
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [session.token])
+    void load()
+  }, [load])
+
+  useEffect(() => {
+    if (showDeleted) void loadDeleted()
+  }, [showDeleted, loadDeleted])
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
     setCreating(true)
     setError(null)
     try {
-      await api.createProject(session.token, {
-        name: name.trim(),
-        description: description.trim() || undefined,
-      })
+      await api.createChild(org.path, "projects", name.trim())
       setName("")
-      setDescription("")
       await load()
     } catch (err) {
       setError(err)
@@ -96,29 +59,26 @@ function ProjectsLoaded({
     }
   }
 
-  async function onDelete(projectId: string) {
-    if (!confirm("Delete this project?")) return
+  async function onRestore(p: Node) {
     setError(null)
     try {
-      await api.deleteProject(session.token, projectId)
-      await load()
+      await api.restoreNode(nodePath(p))
+      await Promise.all([load(), loadDeleted()])
     } catch (err) {
       setError(err)
     }
   }
 
+  const canCreate = org.can(permission.create("project"))
+
   return (
     <>
-      <PageHead
-        eyebrow={
-          <>
-            /organizations/<span className="filled">{session.organization_id}</span>/projects
-          </>
-        }
+      <NodeHead
         title="Projects"
+        section="projects"
         lede={
           <>
-            Projects in <strong>{orgName}</strong>. Your API stores them; the gateway fills in the org.
+            The projects you can see in <strong>{org.name}</strong>.
           </>
         }
       />
@@ -127,27 +87,52 @@ function ProjectsLoaded({
 
       <div className="split">
         <section className="stack-sm">
-          {loading ? (
+          {projects === null ? (
             <Loading />
           ) : (
             <div className="list">
-              {projects.length === 0 && <div className="empty">No projects yet. Create the first one.</div>}
+              {projects.length === 0 && <div className="empty">No projects you can see yet.</div>}
               {projects.map((p) => (
                 <div key={p.id} className="list-item">
                   <div>
-                    <Link className="list-title" to={`/projects/${p.id}`}>
-                      {p.name}
+                    <Link className="list-title" to={nodeHome(p)}>
+                      {p.display_name}
                     </Link>
-                    {p.description && <div className="small text-2">{p.description}</div>}
-                    <div className="list-meta mono">{p.id}</div>
+                    <div className="list-meta mono">{p.slug}</div>
                   </div>
-                  <button type="button" className="btn btn-sm btn-danger" onClick={() => void onDelete(p.id)}>
-                    Delete
-                  </button>
                 </div>
               ))}
             </div>
           )}
+
+          <label className="cluster small">
+            <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
+            Show deleted projects
+          </label>
+          {showDeleted &&
+            (deleted === null ? (
+              <Loading />
+            ) : (
+              <div className="list">
+                {deleted.length === 0 && <div className="empty">No deleted projects.</div>}
+                {deleted.map((p) => (
+                  <div key={p.id} className="list-item">
+                    <div>
+                      <span className="cluster">
+                        <span className="list-title">{p.display_name}</span>
+                        <Status value="deleted" />
+                      </span>
+                      <div className="list-meta">
+                        Restorable until {new Date(p.purge_after!).toLocaleString()}
+                      </div>
+                    </div>
+                    <button type="button" className="btn btn-sm" onClick={() => void onRestore(p)}>
+                      Restore
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ))}
         </section>
 
         <form className="card" onSubmit={(e) => void onCreate(e)}>
@@ -163,21 +148,16 @@ function ProjectsLoaded({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                maxLength={255}
+                maxLength={128}
               />
+              <span className="hint">Its slug, for the path, comes from the name and never changes.</span>
             </div>
-            <div className="field">
-              <label htmlFor="proj_desc">Description</label>
-              <textarea
-                id="proj_desc"
-                className="textarea"
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                maxLength={2000}
-              />
-            </div>
-            <button type="submit" className="btn btn-primary" disabled={creating || !name.trim()}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={creating || !name.trim() || !canCreate}
+              title={canCreate ? undefined : "Needs project:create"}
+            >
               {creating ? "Creating…" : "Create project"}
             </button>
           </div>

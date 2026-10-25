@@ -1,25 +1,32 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
-import { AuditLogPage } from "./pages/AuditLogPage"
 import { AuthProvider } from "./auth/AuthContext"
 import { Layout } from "./components/Layout"
 import { RequireAuth } from "./components/RequireAuth"
-import { OrgProvider } from "./org/OrgContext"
-import { ApiKeysPage } from "./pages/ApiKeysPage"
+import { LearnPage } from "./learn/LearnPage"
+import { NodeScope } from "./org/NodeScope"
+import { OrgsProvider } from "./org/OrgsContext"
+import { AuditPage } from "./pages/AuditPage"
+import { BindingsPage } from "./pages/BindingsPage"
 import { CallbackPage } from "./pages/CallbackPage"
 import { HomePage } from "./pages/HomePage"
-import { LearnPage } from "./learn/LearnPage"
+import { InvitesPage } from "./pages/InvitesPage"
 import { LoginPage } from "./pages/LoginPage"
-import { OrgDetailPage } from "./pages/OrgDetailPage"
+import { MembersPage } from "./pages/MembersPage"
 import { OrgsPage } from "./pages/OrgsPage"
-import { ProfilePage } from "./pages/ProfilePage"
-import { ProjectDetailPage } from "./pages/ProjectDetailPage"
 import { ProjectsPage } from "./pages/ProjectsPage"
+import { ServiceAccountsPage } from "./pages/ServiceAccountsPage"
+import { SettingsPage } from "./pages/SettingsPage"
+import { TasksPage } from "./pages/TasksPage"
+import { UserKeysPage } from "./pages/UserKeysPage"
+import { UserPage } from "./pages/UserPage"
 
+// Paths mirror the gateway's: /user/…, /orgs/{organization}/…, and
+// /orgs/{organization}/projects/{project}/…, by slug.
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <OrgProvider>
+        <OrgsProvider>
           <Routes>
             <Route element={<Layout />}>
               <Route index element={<HomePage />} />
@@ -27,10 +34,18 @@ export default function App() {
               <Route path="callback" element={<CallbackPage />} />
               <Route path="learn" element={<LearnPage />} />
               <Route
-                path="profile"
+                path="user"
                 element={
                   <RequireAuth>
-                    <ProfilePage />
+                    <UserPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="user/keys"
+                element={
+                  <RequireAuth>
+                    <UserKeysPage />
                   </RequireAuth>
                 }
               />
@@ -43,49 +58,35 @@ export default function App() {
                 }
               />
               <Route
-                path="orgs/:orgId/:section?"
+                path="orgs/:org"
                 element={
                   <RequireAuth>
-                    <OrgDetailPage />
+                    <NodeScope kind="organization" param="org" />
                   </RequireAuth>
                 }
-              />
-              <Route
-                path="api-keys"
-                element={
-                  <RequireAuth>
-                    <ApiKeysPage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="projects"
-                element={
-                  <RequireAuth>
-                    <ProjectsPage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="projects/:projectId"
-                element={
-                  <RequireAuth>
-                    <ProjectDetailPage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="audit"
-                element={
-                  <RequireAuth>
-                    <AuditLogPage />
-                  </RequireAuth>
-                }
-              />
+              >
+                <Route index element={<Navigate to="projects" replace />} />
+                <Route path="projects" element={<ProjectsPage />} />
+                <Route path="members" element={<MembersPage />} />
+                <Route path="bindings" element={<BindingsPage />} />
+                <Route path="service-accounts" element={<ServiceAccountsPage />} />
+                <Route path="invites" element={<InvitesPage />} />
+                <Route path="audit-events" element={<AuditPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="projects/:project" element={<NodeScope kind="project" param="project" />}>
+                  <Route index element={<Navigate to="tasks" replace />} />
+                  <Route path="tasks" element={<TasksPage />} />
+                  <Route path="bindings" element={<BindingsPage />} />
+                  <Route path="service-accounts" element={<ServiceAccountsPage />} />
+                  <Route path="invites" element={<InvitesPage />} />
+                  <Route path="audit-events" element={<AuditPage />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                </Route>
+              </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
-        </OrgProvider>
+        </OrgsProvider>
       </AuthProvider>
     </BrowserRouter>
   )

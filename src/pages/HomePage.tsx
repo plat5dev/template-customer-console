@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom"
 import { appName } from "../appName"
 import { useAuth } from "../auth/AuthContext"
-import { useOrg } from "../org/OrgContext"
+import { useOrgs } from "../org/OrgsContext"
 
 export function HomePage() {
   const { authenticated, login } = useAuth()
-  const { activeOrg } = useOrg()
+  const { orgs, lastOrg } = useOrgs()
+  const org = orgs.find((o) => o.slug === lastOrg) ?? (orgs.length === 1 ? orgs[0] : undefined)
 
   return (
     <section className="hero">
@@ -23,16 +24,16 @@ export function HomePage() {
         </div>
       ) : (
         <div className="cluster">
-          {activeOrg ? (
-            <Link className="btn btn-primary btn-lg" to="/projects">
-              Open {activeOrg.name}
+          {org ? (
+            <Link className="btn btn-primary btn-lg" to={`/orgs/${org.slug}/projects`}>
+              Open {org.display_name}
             </Link>
           ) : (
             <Link className="btn btn-primary btn-lg" to="/orgs">
               Pick an organization
             </Link>
           )}
-          <Link className="btn btn-lg" to="/profile">
+          <Link className="btn btn-lg" to="/user">
             Profile
           </Link>
         </div>
