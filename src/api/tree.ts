@@ -8,6 +8,12 @@ type Kind = {
   child: string | null
   /** The page a node opens on: its children, or at the bottom, your API's tasks. */
   home: string
+  /**
+   * The kind's name in permissions (`permission_name` in `plat5.yml`). The starters
+   * give environments `project`: an environment is part of its project, reached through
+   * project:read, project:write and the rest.
+   */
+  permissionName: string
   /** Display names, singular and plural. */
   label: string
   plural: string
@@ -22,6 +28,12 @@ type Kind = {
    * invites off at environments: people join an org, or a project as a guest.
    */
   invites: boolean
+  /**
+   * Whether roles are given here. The starters' services/identity.yml turns off new
+   * bindings at environments: people aren't bound there, and a service account gets its
+   * role when it's created.
+   */
+  bindings: boolean
 }
 
 /**
@@ -35,30 +47,36 @@ export const KINDS: Record<string, Kind> = {
     parent: null,
     child: "project",
     home: "projects",
+    permissionName: "organization",
     label: "Organization",
     plural: "Organizations",
     serviceAccounts: true,
     invites: true,
+    bindings: true,
   },
   project: {
     collection: "projects",
     parent: "organization",
     child: "environment",
     home: "envs",
+    permissionName: "project",
     label: "Project",
     plural: "Projects",
     serviceAccounts: false,
     invites: true,
+    bindings: true,
   },
   environment: {
     collection: "envs",
     parent: "project",
     child: null,
     home: "tasks",
+    permissionName: "project",
     label: "Environment",
     plural: "Environments",
     serviceAccounts: true,
     invites: false,
+    bindings: false,
   },
 }
 
@@ -103,20 +121,26 @@ export function ancestorPaths(node: Node): (Ancestor & { path: string })[] {
   })
 }
 
+/** A kind's name in permissions: `{kind}` in Plat5's resources. */
+function named(kind: string): string {
+  return KINDS[kind]!.permissionName
+}
+
 /**
  * The permissions identity's and audit's routes require by default (Plat5's
- * resources). A deployment that overrides them changes them here too. They only
- * hide what the gateway would refuse: the gateway decides.
+ * resources), by each kind's permission name. A deployment that overrides them
+ * changes them here too. They only hide what the gateway would refuse: the gateway
+ * decides.
  */
 export const permission = {
-  read: (kind: string) => `${kind}:read`,
-  write: (kind: string) => `${kind}:write`,
-  delete: (kind: string) => `${kind}:delete`,
-  create: (kind: string) => `${kind}:create`,
-  bindingsRead: (kind: string) => `${kind}:bindings:read`,
-  bindingsWrite: (kind: string) => `${kind}:bindings:write`,
+  read: (kind: string) => `${named(kind)}:read`,
+  write: (kind: string) => `${named(kind)}:write`,
+  delete: (kind: string) => `${named(kind)}:delete`,
+  create: (kind: string) => `${named(kind)}:create`,
+  bindingsRead: (kind: string) => `${named(kind)}:bindings:read`,
+  bindingsWrite: (kind: string) => `${named(kind)}:bindings:write`,
   /** Invites to a root take its bindings:write; invites below one take guests:write. */
-  invites: (kind: string) => (isRoot(kind) ? `${kind}:bindings:write` : "guests:write"),
+  invites: (kind: string) => (isRoot(kind) ? `${named(kind)}:bindings:write` : "guests:write"),
   auditRead: () => "audit:read",
 }
 

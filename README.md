@@ -64,7 +64,7 @@ For production, the Dockerfile's last stage builds the app and serves it with ng
 
 ## What it shows
 
-Sign in → Auth password UI (locally, the seeded `dev@example.com` / `password`; or register, with login codes in the Auth logs) → your profile and keys, your orgs, and inside an org: projects, members, access, service accounts, invites, the audit log and settings; inside a project: its environments, access, invites, the audit log and settings; inside an environment: tasks, access, service accounts, invites, the audit log and settings.
+Sign in → Auth password UI (locally, the seeded `dev@example.com` / `password`; or register, with login codes in the Auth logs) → your profile and keys, your orgs, and inside an org: projects, members, access, service accounts, invites, the audit log and settings; inside a project: its environments, access, invites, the audit log and settings; inside an environment: tasks, access, service accounts, the audit log and settings.
 
 **One credential.** Every call sends the person's Auth token as `Authorization: Bearer`. The same token reaches every org they're in; there are no sessions. The browser never sends ids for the caller: the gateway resolves the person from the token and the node from the path.
 
@@ -76,7 +76,7 @@ Sign in → Auth password UI (locally, the seeded `dev@example.com` / `password`
 
 **What you can do here.** Each node's pages load `GET …/membership`: your member id (to mark "you"), your roles there (badges, and "Guest" for a guest), and your permissions. Buttons for routes your permissions don't reach are hidden or disabled; the gateway still decides. The permission names are identity's and audit's defaults, in `src/api/tree.ts`.
 
-**Projects and environments** are `GET`/`POST /orgs/{organization}/projects` and `…/projects/{project}/envs` (the lists walk `has_more`), renamed and deleted on the node, with `?status=deleted` and `POST …/restore`. Creating a project also creates its `Production` and `Development` environments (`DEFAULT_ENVIRONMENTS` in `src/api/tree.ts`), which takes `environment:create`. An environment's tasks are your API's.
+**Projects and environments** are `GET`/`POST /orgs/{organization}/projects` and `…/projects/{project}/envs` (the lists walk `has_more`), renamed and deleted on the node, with `?status=deleted` and `POST …/restore`. Creating a project also creates its `Production` and `Development` environments (`DEFAULT_ENVIRONMENTS` in `src/api/tree.ts`), which takes `project:create`: the starters give environments `permission_name: project`, so an environment's routes require `project:*`, and `permissionName` in `KINDS` says so here. An environment's tasks are your API's.
 
 **Access** is `GET …/bindings`, in two parts: the roles given here, which you change and remove, and the inherited ones, given on a node above, each with a link to where it sits. Service accounts are beside people, guests marked. The starters' projects and environments don't bind their creator (`bind_creator: false` in `plat5.yml`), so a fresh environment's own list is empty and its access comes from above. `POST …/bindings` gives a member a role from `GET …/roles`; `PATCH` and `DELETE …/bindings/{binding_id}` change or remove it. **Members** is `GET /orgs/{organization}/members`; remove with `DELETE …/members/{member_id}`, leave with `DELETE /orgs/{organization}/membership`, or add a person by IdP subject (shown on their Profile page) with `POST …/members`.
 

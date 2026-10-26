@@ -31,6 +31,7 @@ export function BindingsPage() {
 
   const canRead = view.can(permission.bindingsRead(view.kind))
   const canWrite = view.can(permission.bindingsWrite(view.kind))
+  const givesRoles = KINDS[view.kind]!.bindings
 
   const load = useCallback(async () => {
     try {
@@ -50,9 +51,9 @@ export function BindingsPage() {
   // The org's members, to pick from. Without the permission to list them, a member id instead.
   const canListMembers = root.can(permission.bindingsRead(root.kind))
   useEffect(() => {
-    if (!canWrite || !canListMembers) return
+    if (!givesRoles || !canWrite || !canListMembers) return
     api.listMembers(root.path).then(setMembers, () => setMembers(null))
-  }, [canWrite, canListMembers, root.path])
+  }, [givesRoles, canWrite, canListMembers, root.path])
 
   /** Where an inherited binding sits: one of the nodes above, in view. */
   function from(b: Binding) {
@@ -226,71 +227,83 @@ export function BindingsPage() {
               </>
             )}
             <p className="small muted">
-              New people join by{" "}
-              {KINDS[view.kind]!.invites ? (
-                <Link to={`${view.path}/invites`}>invite</Link>
+              {!givesRoles ? (
+                <>
+                  People reach {view.name} through roles above it. A{" "}
+                  <Link to={`${view.path}/service-accounts`}>service account</Link> gets its role here when it's
+                  created.
+                </>
               ) : (
-                <Link to={`${root.path}/invites`}>invite to {root.name}</Link>
+                <>
+                  New people join by{" "}
+                  {KINDS[view.kind]!.invites ? (
+                    <Link to={`${view.path}/invites`}>invite</Link>
+                  ) : (
+                    <Link to={`${root.path}/invites`}>invite to {root.name}</Link>
+                  )}
+                  .
+                </>
               )}
-              .
             </p>
           </section>
 
-          <form className="card" onSubmit={(e) => void onAdd(e)}>
-            <div className="card-head">
-              <h2>Give a role here</h2>
-            </div>
-            <div className="card-body">
-              <div className="field">
-                <label htmlFor="binding_member">Member</label>
-                {members ? (
-                  <select
-                    id="binding_member"
-                    className="select"
-                    value={memberId}
-                    onChange={(e) => setMemberId(e.target.value)}
-                    required
-                  >
-                    <option value="" disabled>
-                      Choose a member
-                    </option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {memberName(m)}
-                        {m.id === view.membership.member_id ? " (you)" : ""}
+          {givesRoles && (
+            <form className="card" onSubmit={(e) => void onAdd(e)}>
+              <div className="card-head">
+                <h2>Give a role here</h2>
+              </div>
+              <div className="card-body">
+                <div className="field">
+                  <label htmlFor="binding_member">Member</label>
+                  {members ? (
+                    <select
+                      id="binding_member"
+                      className="select"
+                      value={memberId}
+                      onChange={(e) => setMemberId(e.target.value)}
+                      required
+                    >
+                      <option value="" disabled>
+                        Choose a member
                       </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    id="binding_member"
-                    className="input mono"
-                    value={memberId}
-                    onChange={(e) => setMemberId(e.target.value)}
-                    required
-                    placeholder="member id"
-                  />
-                )}
-                <span className="hint">Someone already in {root.name}, or one of its service accounts.</span>
+                      {members.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {memberName(m)}
+                          {m.id === view.membership.member_id ? " (you)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      id="binding_member"
+                      className="input mono"
+                      value={memberId}
+                      onChange={(e) => setMemberId(e.target.value)}
+                      required
+                      placeholder="member id"
+                    />
+                  )}
+                  <span className="hint">Someone already in {root.name}, or one of its service accounts.</span>
+                </div>
+                <div className="field">
+                  <label htmlFor="binding_role">Role</label>
+                  <RoleSelect id="binding_role" roles={roles} value={role} onChange={setRole} />
+                  <span className="hint">
+                    Anyone who can give roles here can give any of them, even one with more permissions than their
+                    own.
+                  </span>
+                </div>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={adding || !memberId.trim() || !role || !canWrite}
+                  title={canWrite ? undefined : `Needs ${permission.bindingsWrite(view.kind)}`}
+                >
+                  {adding ? "Adding…" : "Add"}
+                </button>
               </div>
-              <div className="field">
-                <label htmlFor="binding_role">Role</label>
-                <RoleSelect id="binding_role" roles={roles} value={role} onChange={setRole} />
-                <span className="hint">
-                  Anyone who can give roles here can give any of them, even one with more permissions than their
-                  own.
-                </span>
-              </div>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={adding || !memberId.trim() || !role || !canWrite}
-                title={canWrite ? undefined : `Needs ${permission.bindingsWrite(view.kind)}`}
-              >
-                {adding ? "Adding…" : "Add"}
-              </button>
-            </div>
-          </form>
+            </form>
+          )}
         </div>
       )}
     </>
