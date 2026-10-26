@@ -58,8 +58,8 @@ export function ChildrenPage({ kind }: { kind: string }) {
     try {
       const created = await api.createChild(parent.path, collection, name.trim())
       setName("")
-      // A new project starts with its environments. Its creator holds creator_role
-      // on it, so they may create them.
+      // A new project starts with its environments. Creating them takes
+      // environment:create, which the starters' roles that create projects hold.
       if (kind === "project") {
         for (const env of DEFAULT_ENVIRONMENTS) {
           await api.createChild(nodePath(created), KINDS.environment!.collection, env)

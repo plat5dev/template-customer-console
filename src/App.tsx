@@ -77,9 +77,9 @@ export default function App() {
 }
 
 /**
- * A kind's pages, and its child kind's below them: each node has Access, Invites,
- * Audit log and Settings; its children's list, or at the bottom, your API's tasks;
- * Members on a root; Service accounts where they belong.
+ * A kind's pages, and its child kind's below them: each node has Access, Audit log
+ * and Settings; its children's list, or at the bottom, your API's tasks; Members on a
+ * root; Invites and Service accounts where they belong.
  */
 function nodeRoutes(kind: string) {
   const k = KINDS[kind]!
@@ -91,7 +91,7 @@ function nodeRoutes(kind: string) {
       {isRoot(kind) && <Route path="members" element={<MembersPage />} />}
       <Route path="bindings" element={<BindingsPage />} />
       {k.serviceAccounts && <Route path="service-accounts" element={<ServiceAccountsPage />} />}
-      <Route path="invites" element={<InvitesPage />} />
+      {k.invites && <Route path="invites" element={<InvitesPage />} />}
       <Route path="audit-events" element={<AuditPage />} />
       <Route path="settings" element={<SettingsPage />} />
       {k.child && nodeRoutes(k.child)}

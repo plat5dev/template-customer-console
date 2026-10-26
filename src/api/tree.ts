@@ -17,6 +17,11 @@ type Kind = {
    * an environment, for that environment's keys.
    */
   serviceAccounts: boolean
+  /**
+   * Whether people are invited at this kind. The starters' services/identity.yml turns
+   * invites off at environments: people join an org, or a project as a guest.
+   */
+  invites: boolean
 }
 
 /**
@@ -33,6 +38,7 @@ export const KINDS: Record<string, Kind> = {
     label: "Organization",
     plural: "Organizations",
     serviceAccounts: true,
+    invites: true,
   },
   project: {
     collection: "projects",
@@ -42,6 +48,7 @@ export const KINDS: Record<string, Kind> = {
     label: "Project",
     plural: "Projects",
     serviceAccounts: false,
+    invites: true,
   },
   environment: {
     collection: "envs",
@@ -51,6 +58,7 @@ export const KINDS: Record<string, Kind> = {
     label: "Environment",
     plural: "Environments",
     serviceAccounts: true,
+    invites: false,
   },
 }
 

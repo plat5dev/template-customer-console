@@ -157,7 +157,7 @@ function NodeNav({ here }: { here: Segment | null }) {
       {k.serviceAccounts && (
         <Item to={`${at}/service-accounts`} icon="bots" disabled={disabled}>Service accounts</Item>
       )}
-      <Item to={`${at}/invites`} icon="invites" disabled={disabled}>Invites</Item>
+      {k.invites && <Item to={`${at}/invites`} icon="invites" disabled={disabled}>Invites</Item>}
       <Item to={`${at}/audit-events`} icon="audit" disabled={disabled}>Audit log</Item>
       <Item to={`${at}/settings`} icon="settings" disabled={disabled}>Settings</Item>
     </nav>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { Link } from "react-router-dom"
 import { api } from "../api/endpoints"
-import { permission } from "../api/tree"
+import { KINDS, permission } from "../api/tree"
 import type { Binding, Member, Role } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { initials } from "../components/initials"
@@ -12,8 +12,9 @@ import { Loading } from "../components/ui"
 import { useNodeView, useNodeViews, useRootView } from "../org/nodeView"
 
 /**
- * Who has access here: every binding that counts at the node, its own and its
- * ancestors'. A binding gives a member of the org a role on one node.
+ * Who has access here, in two parts: the roles given on this node, and the ones
+ * given above it that count here too. A binding gives a member of the org a role
+ * on one node.
  */
 export function BindingsPage() {
   const view = useNodeView()
@@ -104,6 +105,84 @@ export function BindingsPage() {
     }
   }
 
+  /** One section's bindings: here, editable with the permission; inherited, with where each sits. */
+  function table(list: Binding[], here: boolean, empty: React.ReactNode) {
+    return (
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>member</th>
+              <th>role</th>
+              {!here && <th>from</th>}
+              {here && <th />}
+            </tr>
+          </thead>
+          <tbody>
+            {list.length === 0 && (
+              <tr>
+                <td colSpan={3} className="muted">
+                  {empty}
+                </td>
+              </tr>
+            )}
+            {list.map((b) => {
+              const bot = b.principal === "service_account"
+              const mine = b.member_id === view.membership.member_id
+              return (
+                <tr key={b.id}>
+                  <td>
+                    <span className="who">
+                      <span className={`avatar${bot ? " square" : ""}`}>{bot ? "SA" : initials(memberName(b))}</span>
+                      <span>
+                        <span className="cluster">
+                          {memberName(b)}
+                          {b.guest && <span className="badge badge-accent">Guest</span>}
+                        </span>
+                        <span className="sub mono">
+                          {mine ? "you · " : bot ? "service account · " : ""}
+                          {b.member_id}
+                        </span>
+                      </span>
+                    </span>
+                  </td>
+                  <td>
+                    {here && canWrite ? (
+                      <RoleSelect
+                        roles={roles}
+                        ariaLabel={`Role of ${memberName(b)}`}
+                        value={b.role}
+                        disabled={busy === b.id}
+                        onChange={(r) => void onRole(b, r)}
+                      />
+                    ) : (
+                      <span className="badge">{b.role}</span>
+                    )}
+                  </td>
+                  {!here && <td>{from(b)}</td>}
+                  {here && (
+                    <td className="actions">
+                      {canWrite && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-ghost"
+                          disabled={busy === b.id}
+                          onClick={() => void onRemove(b)}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
   return (
     <>
       <NodeHead
@@ -123,86 +202,37 @@ export function BindingsPage() {
         </div>
       ) : (
         <div className="split">
-          <section className="stack-sm">
+          <section className="stack">
             {bindings === null ? (
               <Loading />
             ) : (
-              <div className="table-wrap">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>member</th>
-                      <th>role</th>
-                      <th>where</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bindings.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="muted">
-                          No bindings.
-                        </td>
-                      </tr>
-                    )}
-                    {bindings.map((b) => {
-                      const bot = b.principal === "service_account"
-                      const mine = b.member_id === view.membership.member_id
-                      return (
-                        <tr key={b.id}>
-                          <td>
-                            <span className="who">
-                              <span className={`avatar${bot ? " square" : ""}`}>
-                                {bot ? "SA" : initials(memberName(b))}
-                              </span>
-                              <span>
-                                <span className="cluster">
-                                  {memberName(b)}
-                                  {b.guest && <span className="badge badge-accent">Guest</span>}
-                                </span>
-                                <span className="sub mono">
-                                  {mine ? "you · " : bot ? "service account · " : ""}
-                                  {b.member_id}
-                                </span>
-                              </span>
-                            </span>
-                          </td>
-                          <td>
-                            {!b.inherited && canWrite ? (
-                              <RoleSelect
-                                roles={roles}
-                                ariaLabel={`Role of ${memberName(b)}`}
-                                value={b.role}
-                                disabled={busy === b.id}
-                                onChange={(r) => void onRole(b, r)}
-                              />
-                            ) : (
-                              <span className="badge">{b.role}</span>
-                            )}
-                          </td>
-                          <td>{b.inherited ? <>from {from(b)}</> : "here"}</td>
-                          <td className="actions">
-                            {!b.inherited && canWrite && (
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-ghost"
-                                disabled={busy === b.id}
-                                onClick={() => void onRemove(b)}
-                              >
-                                Remove
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <div className="stack-sm">
+                  <h2 className="section-title">Here</h2>
+                  <p className="section-lede">Roles given on {view.name} itself.</p>
+                  {table(
+                    bindings.filter((b) => !b.inherited),
+                    true,
+                    <>None. Everyone below reaches {view.name} through roles above it.</>,
+                  )}
+                </div>
+                {views.length > 1 && (
+                  <div className="stack-sm">
+                    <h2 className="section-title">Inherited</h2>
+                    <p className="section-lede">Roles given above {view.name}, which count here too. Change one where it sits.</p>
+                    {table(bindings.filter((b) => b.inherited), false, <>None.</>)}
+                  </div>
+                )}
+              </>
             )}
             <p className="small muted">
-              A role bound above applies here too: change it where it sits. New people join by{" "}
-              <Link to={`${view.path}/invites`}>invite</Link>.
+              New people join by{" "}
+              {KINDS[view.kind]!.invites ? (
+                <Link to={`${view.path}/invites`}>invite</Link>
+              ) : (
+                <Link to={`${root.path}/invites`}>invite to {root.name}</Link>
+              )}
+              .
             </p>
           </section>
 
