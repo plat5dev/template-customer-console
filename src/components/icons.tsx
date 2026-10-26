@@ -1,6 +1,7 @@
 // Sidebar icons: 16px, stroked with the text color.
 const paths = {
   projects: "M2 3.5h12v9.5H2zM2 6.5h12",
+  envs: "M8 2l6 3-6 3-6-3zM2 8l6 3 6-3M2 11l6 3 6-3",
   members:
     "M6 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM1.5 13.5c.6-2.4 2.3-3.5 4.5-3.5s3.9 1.1 4.5 3.5M11 3a2.5 2.5 0 0 1 0 5M12.5 10.3c1 .5 1.7 1.6 2 3.2",
   access: "M8 1.5l5 2v4c0 3-2.2 5.3-5 6.5-2.8-1.2-5-3.5-5-6.5v-4zM5.8 8l1.6 1.6 2.9-3",

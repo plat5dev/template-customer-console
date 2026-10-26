@@ -11,9 +11,9 @@ import { useMembers } from "../org/useMembers"
 
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "done"]
 
-/** A project's tasks, on your API: `/orgs/{organization}/projects/{project}/tasks`. */
+/** An environment's tasks, on your API: `…/projects/{project}/envs/{environment}/tasks`. */
 export function TasksPage() {
-  const project = useNodeView()
+  const env = useNodeView()
   const org = useRootView()
   const [tasks, setTasks] = useState<Task[] | null>(null)
   const [title, setTitle] = useState("")
@@ -25,21 +25,21 @@ export function TasksPage() {
   const [savingTask, setSavingTask] = useState(false)
 
   const authors = useMembers(org.path, tasks?.map((t) => t.created_by) ?? [])
-  const canWrite = project.can(permission.write("project"))
+  const canWrite = env.can(permission.write("environment"))
 
   useEffect(() => {
-    api.listTasks(project.path).then(setTasks, (e: unknown) => {
+    api.listTasks(env.path).then(setTasks, (e: unknown) => {
       setError(e)
       setTasks([])
     })
-  }, [project.path])
+  }, [env.path])
 
   async function onCreateTask(e: FormEvent) {
     e.preventDefault()
     setCreating(true)
     setError(null)
     try {
-      const task = await api.createTask(project.path, title.trim())
+      const task = await api.createTask(env.path, title.trim())
       setTitle("")
       setTasks((prev) => [...(prev ?? []), task])
     } catch (err) {
@@ -51,7 +51,7 @@ export function TasksPage() {
 
   async function onUpdate(task: Task, body: { title?: string; status?: TaskStatus }) {
     setError(null)
-    const updated = await api.updateTask(project.path, task.id, body)
+    const updated = await api.updateTask(env.path, task.id, body)
     setTasks((prev) => (prev ?? []).map((t) => (t.id === updated.id ? updated : t)))
   }
 
@@ -89,7 +89,7 @@ export function TasksPage() {
     if (!confirm("Delete this task?")) return
     setError(null)
     try {
-      await api.deleteTask(project.path, task.id)
+      await api.deleteTask(env.path, task.id)
       setTasks((prev) => (prev ?? []).filter((t) => t.id !== task.id))
     } catch (err) {
       setError(err)
@@ -97,7 +97,7 @@ export function TasksPage() {
   }
 
   function author(t: Task): string {
-    if (t.created_by === project.membership.member_id) return "you"
+    if (t.created_by === env.membership.member_id) return "you"
     const m = authors.get(t.created_by)
     return m ? memberName(m) : t.created_by
   }
@@ -106,7 +106,7 @@ export function TasksPage() {
 
   return (
     <>
-      <NodeHead title={project.name} section="tasks" lede="Tasks in this project, on your API." />
+      <NodeHead title={env.name} section="tasks" lede="Tasks in this environment, on your API." />
 
       <div className="stats">
         {counts.map(([st, n]) => (
@@ -139,7 +139,7 @@ export function TasksPage() {
             type="submit"
             className="btn btn-primary"
             disabled={creating || !title.trim() || !canWrite}
-            title={canWrite ? undefined : "Needs project:write"}
+            title={canWrite ? undefined : "Needs environment:write"}
           >
             {creating ? "Adding…" : "Add task"}
           </button>

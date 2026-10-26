@@ -1,14 +1,72 @@
 import type { Ancestor, Node } from "./types"
 
-/**
- * The deployment's kinds, as `plat5.yml` declares them: each kind's collection in
- * the path (`/orgs/{organization}`, `/projects/{project}`), and the page a node
- * opens on. Console paths are the gateway's paths, by slug.
- */
-export const KINDS: Record<string, { collection: string; parent: string | null; home: string }> = {
-  organization: { collection: "orgs", parent: null, home: "projects" },
-  project: { collection: "projects", parent: "organization", home: "tasks" },
+type Kind = {
+  /** The kind's collection in the path: `/orgs/{organization}`, `/projects/{project}`. */
+  collection: string
+  parent: string | null
+  /** The kind below it, or null at the bottom of the tree. */
+  child: string | null
+  /** The page a node opens on: its children, or at the bottom, your API's tasks. */
+  home: string
+  /** Display names, singular and plural. */
+  label: string
+  plural: string
+  /**
+   * Whether service accounts belong at this kind. The starters' services/identity.yml
+   * turns them off at projects: they belong to an org, for automation across it, or to
+   * an environment, for that environment's keys.
+   */
+  serviceAccounts: boolean
 }
+
+/**
+ * The deployment's kinds, as `plat5.yml` declares them (organization > project >
+ * environment), and how this app shows each. Console paths are the gateway's paths, by
+ * slug.
+ */
+export const KINDS: Record<string, Kind> = {
+  organization: {
+    collection: "orgs",
+    parent: null,
+    child: "project",
+    home: "projects",
+    label: "Organization",
+    plural: "Organizations",
+    serviceAccounts: true,
+  },
+  project: {
+    collection: "projects",
+    parent: "organization",
+    child: "environment",
+    home: "envs",
+    label: "Project",
+    plural: "Projects",
+    serviceAccounts: false,
+  },
+  environment: {
+    collection: "envs",
+    parent: "project",
+    child: null,
+    home: "tasks",
+    label: "Environment",
+    plural: "Environments",
+    serviceAccounts: true,
+  },
+}
+
+/** The kinds root first: organization, project, environment. */
+export const CHAIN: string[] = (() => {
+  const out: string[] = []
+  let k: string | null = Object.keys(KINDS).find((n) => KINDS[n]!.parent === null) ?? null
+  while (k) {
+    out.push(k)
+    k = KINDS[k]!.child
+  }
+  return out
+})()
+
+/** The environments a new project starts with, created by this app right after it. */
+export const DEFAULT_ENVIRONMENTS = ["Production", "Development"]
 
 export function isRoot(kind: string): boolean {
   return KINDS[kind]!.parent === null
@@ -18,12 +76,12 @@ function segment(n: Ancestor | Node): string {
   return `/${KINDS[n.kind]!.collection}/${n.slug}`
 }
 
-/** A node's path from its chain: `/orgs/acme/projects/web`. */
+/** A node's path from its chain: `/orgs/acme/projects/web/envs/production`. */
 export function nodePath(node: Node): string {
   return node.ancestors.map(segment).join("") + segment(node)
 }
 
-/** Where a node opens in this app: an org's projects, a project's tasks. */
+/** Where a node opens in this app: its children, or an environment's tasks. */
 export function nodeHome(node: Node): string {
   return `${nodePath(node)}/${KINDS[node.kind]!.home}`
 }

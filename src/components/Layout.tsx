@@ -1,12 +1,32 @@
-import { useEffect, useRef, useState } from "react"
-import { Link, NavLink, Outlet, useLocation, useMatch, useNavigate } from "react-router-dom"
+import { useEffect, useRef, useState, type ReactNode } from "react"
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
 import { Icon, type IconName } from "./icons"
 import { initials } from "./initials"
 import { Wordmark } from "./Wordmark"
+import { api } from "../api/endpoints"
+import { CHAIN, KINDS } from "../api/tree"
+import type { Node as TreeNode } from "../api/types"
 import { useAuth } from "../auth/AuthContext"
 import { useOrgs } from "../org/OrgsContext"
 import { config } from "../config"
 import { applyTheme, loadTheme, type Theme } from "../theme"
+
+/** A node named by the URL: its kind, slug and path. */
+type Segment = { kind: string; slug: string; path: string }
+
+/** The nodes the URL names, root first: `/orgs/acme/projects/web/…` is the org, then the project. */
+function chainFromPath(pathname: string): Segment[] {
+  const parts = pathname.split("/").filter(Boolean)
+  const out: Segment[] = []
+  let path = ""
+  for (const [i, kind] of CHAIN.entries()) {
+    const collection = KINDS[kind]!.collection
+    if (parts[i * 2] !== collection || !parts[i * 2 + 1]) break
+    path += `/${collection}/${parts[i * 2 + 1]}`
+    out.push({ kind, slug: parts[i * 2 + 1]!, path })
+  }
+  return out
+}
 
 export function Layout() {
   const { authenticated, login, logout, ready } = useAuth()
@@ -17,15 +37,19 @@ export function Layout() {
   const open = openOn === location.pathname
   const setOpen = (v: boolean) => setOpenOn(v ? location.pathname : null)
 
-  // The org and project in the path, else the org opened last.
-  const urlOrg = useMatch("/orgs/:org/*")?.params.org
-  const urlProject = useMatch("/orgs/:org/projects/:project/*")?.params.project
+  // The nodes in the path, else the org opened last.
+  const urlChain = chainFromPath(location.pathname)
+  const urlOrg = urlChain[0]?.slug
   useEffect(() => {
     if (urlOrg) setLastOrg(urlOrg)
   }, [urlOrg, setLastOrg])
-  const orgSlug = urlOrg ?? (lastOrg && orgs.some((o) => o.slug === lastOrg) ? lastOrg : null)
-  const org = orgSlug ? `/orgs/${orgSlug}` : null
-  const project = org && urlProject ? `${org}/projects/${urlProject}` : null
+  const remembered = lastOrg && orgs.some((o) => o.slug === lastOrg) ? lastOrg : null
+  const chain: Segment[] = urlChain.length
+    ? urlChain
+    : remembered
+      ? [{ kind: CHAIN[0]!, slug: remembered, path: `/${KINDS[CHAIN[0]!]!.collection}/${remembered}` }]
+      : []
+  const here = chain[chain.length - 1]
 
   return (
     <div className="shell" data-open={open}>
@@ -42,32 +66,24 @@ export function Layout() {
           <Brand />
         </div>
 
-        {authenticated && <OrgSwitcher current={orgSlug} />}
-
         {authenticated && (
-          <nav className="nav-group" aria-label="Organization">
-            <h2>organization</h2>
-            <Item to={`${org}/projects`} icon="projects" disabled={!org} end>Projects</Item>
-            <Item to={`${org}/members`} icon="members" disabled={!org}>Members</Item>
-            <Item to={`${org}/bindings`} icon="access" disabled={!org}>Access</Item>
-            <Item to={`${org}/service-accounts`} icon="bots" disabled={!org}>Service accounts</Item>
-            <Item to={`${org}/invites`} icon="invites" disabled={!org}>Invites</Item>
-            <Item to={`${org}/audit-events`} icon="audit" disabled={!org}>Audit log</Item>
-            <Item to={`${org}/settings`} icon="settings" disabled={!org}>Settings</Item>
-          </nav>
+          <div className="chain" aria-label="Where you are">
+            <OrgSwitcher current={chain[0]?.slug ?? null} />
+            {CHAIN.slice(1).map((kind, i) =>
+              chain[i] ? (
+                <ChildSwitcher
+                  key={`${chain[i]!.path}/${kind}`}
+                  kind={kind}
+                  parentPath={chain[i]!.path}
+                  current={chain[i + 1]?.slug ?? null}
+                  depth={i + 1}
+                />
+              ) : null,
+            )}
+          </div>
         )}
 
-        {authenticated && project && (
-          <nav className="nav-group" aria-label="Project">
-            <h2>project</h2>
-            <Item to={`${project}/tasks`} icon="projects">Tasks</Item>
-            <Item to={`${project}/bindings`} icon="access">Access</Item>
-            <Item to={`${project}/service-accounts`} icon="bots">Service accounts</Item>
-            <Item to={`${project}/invites`} icon="invites">Invites</Item>
-            <Item to={`${project}/audit-events`} icon="audit">Audit log</Item>
-            <Item to={`${project}/settings`} icon="settings">Settings</Item>
-          </nav>
-        )}
+        {authenticated && <NodeNav here={here ?? null} />}
 
         {authenticated && (
           <nav className="nav-group" aria-label="You">
@@ -110,6 +126,44 @@ export function Layout() {
   )
 }
 
+/**
+ * The pages of the node you're in, the innermost in the path: its children (or your
+ * API's tasks, at the bottom), members on a root, access, service accounts where they
+ * belong, invites, audit log and settings. Before an org is picked, the org's pages,
+ * disabled.
+ */
+function NodeNav({ here }: { here: Segment | null }) {
+  const kind = here?.kind ?? CHAIN[0]!
+  const k = KINDS[kind]!
+  const at = here?.path ?? ""
+  const disabled = !here
+  return (
+    <nav className="nav-group" aria-label={k.label}>
+      <h2>{kind}</h2>
+      {k.child ? (
+        <Item
+          to={`${at}/${KINDS[k.child]!.collection}`}
+          icon={k.child === "environment" ? "envs" : "projects"}
+          disabled={disabled}
+          end
+        >
+          {KINDS[k.child]!.plural}
+        </Item>
+      ) : (
+        <Item to={`${at}/tasks`} icon="projects" disabled={disabled}>Tasks</Item>
+      )}
+      {k.parent === null && <Item to={`${at}/members`} icon="members" disabled={disabled}>Members</Item>}
+      <Item to={`${at}/bindings`} icon="access" disabled={disabled}>Access</Item>
+      {k.serviceAccounts && (
+        <Item to={`${at}/service-accounts`} icon="bots" disabled={disabled}>Service accounts</Item>
+      )}
+      <Item to={`${at}/invites`} icon="invites" disabled={disabled}>Invites</Item>
+      <Item to={`${at}/audit-events`} icon="audit" disabled={disabled}>Audit log</Item>
+      <Item to={`${at}/settings`} icon="settings" disabled={disabled}>Settings</Item>
+    </nav>
+  )
+}
+
 function Brand() {
   return (
     <Link to="/" className="brand" aria-label="Home">
@@ -148,12 +202,20 @@ function Item({
   )
 }
 
-/** The org in view, and a menu to switch, list, or create one. */
-function OrgSwitcher({ current }: { current: string | null }) {
-  const { orgs, loading } = useOrgs()
+/** A switcher's button and its menu, closed by a click outside or Escape. */
+function Switcher({
+  button,
+  children,
+  onOpen,
+  className,
+}: {
+  button: ReactNode
+  children: (close: () => void) => ReactNode
+  onOpen?: () => void
+  className?: string
+}) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-  const navigate = useNavigate()
 
   useEffect(() => {
     if (!open) return
@@ -171,33 +233,53 @@ function OrgSwitcher({ current }: { current: string | null }) {
     }
   }, [open])
 
-  function pick(slug: string) {
-    setOpen(false)
-    navigate(`/orgs/${slug}/projects`)
-  }
+  return (
+    <div className={`switcher${className ? ` ${className}` : ""}`} ref={ref}>
+      <button
+        type="button"
+        className="switcher-button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => {
+          if (!open) onOpen?.()
+          setOpen(!open)
+        }}
+      >
+        {button}
+        <span className="chevron" />
+      </button>
+      {open && (
+        <div className="menu" role="menu">
+          {children(() => setOpen(false))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** The org in view, and a menu to switch, list, or create one. */
+function OrgSwitcher({ current }: { current: string | null }) {
+  const { orgs, loading } = useOrgs()
+  const navigate = useNavigate()
 
   const active = orgs.find((o) => o.slug === current)
   const name = active?.display_name ?? current
   const label = name ?? (loading ? "Loading…" : orgs.length ? "Pick an organization" : "No organization")
 
   return (
-    <div className="switcher" ref={ref}>
-      <button
-        type="button"
-        className="switcher-button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
-        <span className="avatar">{name ? initials(name).slice(0, 1) : "–"}</span>
-        <span className="grow">
-          <b>{label}</b>
-          <small>{current ? `/orgs/${current}` : `${orgs.length} available`}</small>
-        </span>
-        <span className="chevron" />
-      </button>
-      {open && (
-        <div className="menu" role="menu">
+    <Switcher
+      button={
+        <>
+          <span className="avatar">{name ? initials(name).slice(0, 1) : "–"}</span>
+          <span className="grow">
+            <b>{label}</b>
+            <small>{current ? `/orgs/${current}` : `${orgs.length} available`}</small>
+          </span>
+        </>
+      }
+    >
+      {(close) => (
+        <>
           {orgs.map((o) => (
             <button
               key={o.id}
@@ -205,22 +287,97 @@ function OrgSwitcher({ current }: { current: string | null }) {
               role="menuitem"
               className="menu-item"
               aria-current={o.slug === current}
-              onClick={() => pick(o.slug)}
+              onClick={() => {
+                close()
+                navigate(`/orgs/${o.slug}/${KINDS.organization!.home}`)
+              }}
             >
               {o.display_name}
             </button>
           ))}
           {orgs.length > 0 && <hr />}
-          <Link role="menuitem" className="menu-item" to="/orgs" onClick={() => setOpen(false)}>
+          <Link role="menuitem" className="menu-item" to="/orgs" onClick={close}>
             All organizations
           </Link>
-          <Link role="menuitem" className="menu-item" to="/orgs#create" onClick={() => setOpen(false)}>
+          <Link role="menuitem" className="menu-item" to="/orgs#create" onClick={close}>
             Create organization
           </Link>
-        </div>
+        </>
       )}
-    </div>
+    </Switcher>
   )
+}
+
+/**
+ * A level below the org: the node of `kind` in view under `parentPath`, and a menu of
+ * its siblings you can see, read when the menu opens. Picking the one you're in opens
+ * it, which is how you go back up from a level below.
+ */
+function ChildSwitcher({
+  kind,
+  parentPath,
+  current,
+  depth,
+}: {
+  kind: string
+  parentPath: string
+  current: string | null
+  depth: number
+}) {
+  const k = KINDS[kind]!
+  const navigate = useNavigate()
+  const [siblings, setSiblings] = useState<TreeNode[] | null>(null)
+
+  const load = () => {
+    api.listChildren(parentPath, k.collection).then(setSiblings, () => setSiblings([]))
+  }
+  useEffect(load, [parentPath, k.collection])
+
+  const active = siblings?.find((s) => s.slug === current)
+  const name = active?.display_name ?? current
+
+  return (
+    <Switcher
+      className={`level level-${depth}`}
+      onOpen={load}
+      button={
+        <span className="grow">
+          <small>{kind}</small>
+          <b className={name ? undefined : "muted"}>{name ?? `Pick ${article(k.label)} ${k.label.toLowerCase()}`}</b>
+        </span>
+      }
+    >
+      {(close) => (
+        <>
+          {siblings === null && <span className="menu-item muted">Loading…</span>}
+          {siblings?.length === 0 && <span className="menu-item muted">None you can see</span>}
+          {siblings?.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              role="menuitem"
+              className="menu-item"
+              aria-current={s.slug === current}
+              onClick={() => {
+                close()
+                navigate(`${parentPath}/${k.collection}/${s.slug}/${k.home}`)
+              }}
+            >
+              {s.display_name}
+            </button>
+          ))}
+          <hr />
+          <Link role="menuitem" className="menu-item" to={`${parentPath}/${k.collection}`} onClick={close}>
+            All {k.plural.toLowerCase()}
+          </Link>
+        </>
+      )}
+    </Switcher>
+  )
+}
+
+function article(word: string): string {
+  return /^[aeiou]/i.test(word) ? "an" : "a"
 }
 
 function ThemeSwitch() {

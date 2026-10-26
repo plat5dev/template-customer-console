@@ -12,7 +12,7 @@ export function HomePage() {
     <section className="hero">
       <p className="eyebrow">your app, on plat5</p>
       <h1>{appName}</h1>
-      <p>Sign in, pick an organization, and work on its projects with your team.</p>
+      <p>Sign in, pick an organization, and work on its projects and their environments with your team.</p>
       {!authenticated ? (
         <div className="cluster">
           <button type="button" className="btn btn-primary btn-lg" onClick={() => void login("/")}>
@@ -25,7 +25,7 @@ export function HomePage() {
       ) : (
         <div className="cluster">
           {org ? (
-            <Link className="btn btn-primary btn-lg" to={`/orgs/${org.slug}/projects`}>
+            <Link className="btn btn-primary btn-lg" to={`/orgs/${org.slug}`}>
               Open {org.display_name}
             </Link>
           ) : (

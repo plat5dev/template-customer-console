@@ -164,7 +164,7 @@ export function SettingsPage() {
               <p className="section-lede">
                 Deletes {view.name}
                 {root ? " and everything in it" : ""}. It can be restored until the deployment's grace period ends,
-                from {root ? "Organizations" : "the deleted projects"}; then it's purged.
+                from {root ? "Organizations" : `the deleted ${KINDS[view.kind]!.plural.toLowerCase()}`}; then it's purged.
               </p>
             </div>
             <div className="card-foot">

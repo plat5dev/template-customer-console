@@ -2,7 +2,7 @@
 # API starter: your customers' console, a client of the Plat5 gateway.
 name: customer-console
 kind: customer-console
-description: Vite + React console for your customers (sign-in, orgs, members, keys, projects)
+description: Vite + React console for your customers (sign-in, orgs, projects and environments, members, keys)
 
 substitute:
   - src/appName.ts

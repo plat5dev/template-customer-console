@@ -151,7 +151,7 @@ export function MembersPage() {
               </div>
             )}
             <p className="small muted">
-              Roles are on <Link to={`${org.path}/bindings`}>Access</Link>. A guest has roles only on projects. To
+              Roles are on <Link to={`${org.path}/bindings`}>Access</Link>. A guest has roles only below the org, on projects or environments. To
               invite people by link, use <Link to={`${org.path}/invites`}>Invites</Link>.
             </p>
           </section>

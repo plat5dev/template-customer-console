@@ -10,7 +10,8 @@ import { useOrgs } from "../org/OrgsContext"
 
 /**
  * The orgs you can see, a create form, the deleted ones you can restore, and
- * the projects you reach in orgs you can't open (`GET /user/nodes?kind=project`).
+ * the places you reach in orgs you can't open, as a guest: the highest node you
+ * reach on each path (`GET /user/nodes`, every kind).
  */
 export function OrgsPage() {
   const { orgs, refresh, loading, error: loadError } = useOrgs()
@@ -19,7 +20,7 @@ export function OrgsPage() {
   const [name, setName] = useState("")
   const [creating, setCreating] = useState(false)
   const [deleted, setDeleted] = useState<Node[]>([])
-  const [guestProjects, setGuestProjects] = useState<Node[]>([])
+  const [guestNodes, setGuestNodes] = useState<Node[]>([])
   const [error, setError] = useState<unknown>(null)
 
   const loadDeleted = useCallback(async () => {
@@ -32,10 +33,11 @@ export function OrgsPage() {
 
   useEffect(() => {
     if (loading) return
-    api.listMyNodes("project").then(
-      (list) => setGuestProjects(list.filter((p) => !orgs.some((o) => o.id === p.root_id))),
-      setError,
-    )
+    api.listMyNodes().then((list) => {
+      const outside = list.filter((n) => !orgs.some((o) => o.id === n.root_id))
+      const ids = new Set(outside.map((n) => n.id))
+      setGuestNodes(outside.filter((n) => !n.ancestors.some((a) => ids.has(a.id))))
+    }, setError)
   }, [orgs, loading])
 
   async function onCreate(e: FormEvent) {
@@ -97,18 +99,22 @@ export function OrgsPage() {
             </div>
           )}
 
-          {guestProjects.length > 0 && (
+          {guestNodes.length > 0 && (
             <div className="stack-sm">
-              <h2 className="section-title">Other projects</h2>
-              <p className="section-lede">Projects you can reach in organizations you can't open, as a guest.</p>
+              <h2 className="section-title">Elsewhere</h2>
+              <p className="section-lede">
+                Projects and environments you can reach in organizations you can't open, as a guest.
+              </p>
               <div className="list">
-                {guestProjects.map((p) => (
-                  <div key={p.id} className="list-item">
+                {guestNodes.map((n) => (
+                  <div key={n.id} className="list-item">
                     <div>
-                      <Link className="list-title" to={nodeHome(p)}>
-                        {p.display_name}
+                      <Link className="list-title" to={nodeHome(n)}>
+                        {n.display_name}
                       </Link>
-                      <div className="list-meta">in {p.ancestors[0]?.display_name}</div>
+                      <div className="list-meta">
+                        {n.kind} in {n.ancestors.map((a) => a.display_name).join(" / ")}
+                      </div>
                     </div>
                   </div>
                 ))}

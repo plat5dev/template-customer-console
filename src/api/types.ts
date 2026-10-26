@@ -92,7 +92,7 @@ export type RolesList = {
   creator_role: string
 }
 
-/** `id` is its member id; `node_id` is where it was born. */
+/** `id` is its member id; `node_id` is the node it belongs to. */
 export type ServiceAccount = {
   id: string
   name: string
@@ -157,7 +157,7 @@ export type TaskStatus = "todo" | "in_progress" | "done"
 /** Your API's task. `created_by` is the member id of whoever created it. */
 export type Task = {
   id: string
-  project_id: string
+  environment_id: string
   title: string
   status: TaskStatus
   created_by: string

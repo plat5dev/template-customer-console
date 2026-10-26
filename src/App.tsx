@@ -1,4 +1,5 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom"
+import { CHAIN, isRoot, KINDS } from "./api/tree"
 import { AuthProvider } from "./auth/AuthContext"
 import { Layout } from "./components/Layout"
 import { RequireAuth } from "./components/RequireAuth"
@@ -8,20 +9,20 @@ import { OrgsProvider } from "./org/OrgsContext"
 import { AuditPage } from "./pages/AuditPage"
 import { BindingsPage } from "./pages/BindingsPage"
 import { CallbackPage } from "./pages/CallbackPage"
+import { ChildrenPage } from "./pages/ChildrenPage"
 import { HomePage } from "./pages/HomePage"
 import { InvitesPage } from "./pages/InvitesPage"
 import { LoginPage } from "./pages/LoginPage"
 import { MembersPage } from "./pages/MembersPage"
 import { OrgsPage } from "./pages/OrgsPage"
-import { ProjectsPage } from "./pages/ProjectsPage"
 import { ServiceAccountsPage } from "./pages/ServiceAccountsPage"
 import { SettingsPage } from "./pages/SettingsPage"
 import { TasksPage } from "./pages/TasksPage"
 import { UserKeysPage } from "./pages/UserKeysPage"
 import { UserPage } from "./pages/UserPage"
 
-// Paths mirror the gateway's: /user/…, /orgs/{organization}/…, and
-// /orgs/{organization}/projects/{project}/…, by slug.
+// Paths mirror the gateway's, by slug: /user/…, /orgs/{organization}/…,
+// /orgs/{organization}/projects/{project}/…, and …/envs/{environment}/….
 export default function App() {
   return (
     <BrowserRouter>
@@ -58,30 +59,13 @@ export default function App() {
                 }
               />
               <Route
-                path="orgs/:org"
                 element={
                   <RequireAuth>
-                    <NodeScope kind="organization" param="org" />
+                    <Outlet />
                   </RequireAuth>
                 }
               >
-                <Route index element={<Navigate to="projects" replace />} />
-                <Route path="projects" element={<ProjectsPage />} />
-                <Route path="members" element={<MembersPage />} />
-                <Route path="bindings" element={<BindingsPage />} />
-                <Route path="service-accounts" element={<ServiceAccountsPage />} />
-                <Route path="invites" element={<InvitesPage />} />
-                <Route path="audit-events" element={<AuditPage />} />
-                <Route path="settings" element={<SettingsPage />} />
-                <Route path="projects/:project" element={<NodeScope kind="project" param="project" />}>
-                  <Route index element={<Navigate to="tasks" replace />} />
-                  <Route path="tasks" element={<TasksPage />} />
-                  <Route path="bindings" element={<BindingsPage />} />
-                  <Route path="service-accounts" element={<ServiceAccountsPage />} />
-                  <Route path="invites" element={<InvitesPage />} />
-                  <Route path="audit-events" element={<AuditPage />} />
-                  <Route path="settings" element={<SettingsPage />} />
-                </Route>
+                {nodeRoutes(CHAIN[0]!)}
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
@@ -89,5 +73,28 @@ export default function App() {
         </OrgsProvider>
       </AuthProvider>
     </BrowserRouter>
+  )
+}
+
+/**
+ * A kind's pages, and its child kind's below them: each node has Access, Invites,
+ * Audit log and Settings; its children's list, or at the bottom, your API's tasks;
+ * Members on a root; Service accounts where they belong.
+ */
+function nodeRoutes(kind: string) {
+  const k = KINDS[kind]!
+  return (
+    <Route path={`${k.collection}/:${kind}`} element={<NodeScope kind={kind} param={kind} />}>
+      <Route index element={<Navigate to={k.home} replace />} />
+      {k.child && <Route path={KINDS[k.child]!.collection} element={<ChildrenPage kind={k.child} />} />}
+      {!k.child && <Route path="tasks" element={<TasksPage />} />}
+      {isRoot(kind) && <Route path="members" element={<MembersPage />} />}
+      <Route path="bindings" element={<BindingsPage />} />
+      {k.serviceAccounts && <Route path="service-accounts" element={<ServiceAccountsPage />} />}
+      <Route path="invites" element={<InvitesPage />} />
+      <Route path="audit-events" element={<AuditPage />} />
+      <Route path="settings" element={<SettingsPage />} />
+      {k.child && nodeRoutes(k.child)}
+    </Route>
   )
 }

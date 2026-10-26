@@ -18,8 +18,8 @@ const EXPIRES: { label: string; value: string }[] = [
 
 /**
  * Invite links to this node. To the org: a role there, and roles on projects
- * (`grants`) on redeem. To a project: a role there, which makes someone outside
- * the org a guest. Plat5 sends no email; you share the link.
+ * (`grants`) on redeem. Below the org, to a project or an environment: a role
+ * there, which makes someone outside the org a guest. Plat5 sends no email; you share the link.
  */
 export function InvitesPage() {
   const view = useNodeView()

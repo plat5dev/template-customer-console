@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { Link } from "react-router-dom"
 import { api } from "../api/endpoints"
-import { permission } from "../api/tree"
+import { isRoot, permission } from "../api/tree"
 import type { Role, ServiceAccount } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { NodeHead } from "../components/NodeHead"
@@ -10,7 +10,11 @@ import { ServiceAccountKeys } from "../components/ServiceAccountKeys"
 import { Loading } from "../components/ui"
 import { useNodeView } from "../org/nodeView"
 
-/** Members for machines, born at this node: CI, a backend job, an integration. */
+/**
+ * Members for machines that belong to this node: CI, a backend job, an integration.
+ * They belong to an org, for automation across it, or to an environment, for that
+ * environment's keys, and are deleted with it.
+ */
 export function ServiceAccountsPage() {
   const view = useNodeView()
   const [accounts, setAccounts] = useState<ServiceAccount[] | null>(null)
@@ -94,14 +98,20 @@ export function ServiceAccountsPage() {
         <div className="split">
           <section className="stack-sm">
             <p className="section-lede">
-              Each is a member of the org with roles of its own, and keys that act as it. Its roles are on{" "}
-              <Link to={`${view.path}/bindings`}>Access</Link>.
+              {isRoot(view.kind) ? (
+                <>For automation across {view.name}: bind one wherever it needs to work.</>
+              ) : (
+                <>Keys for {view.name}.</>
+              )}{" "}
+              Each belongs to {view.name} and is deleted with it, is a member of the org with roles of its own, and
+              has keys that act as it. Its roles are on <Link to={`${view.path}/bindings`}>Access</Link>, where
+              accounts from above that can reach it are listed too.
             </p>
             {accounts === null ? (
               <Loading />
             ) : (
               <div className="list">
-                {accounts.length === 0 && <div className="empty">No service accounts born here.</div>}
+                {accounts.length === 0 && <div className="empty">No service accounts belong here.</div>}
                 {accounts.map((sa) => (
                   <div key={sa.id} className="list-item stacked">
                     <div className="spread">

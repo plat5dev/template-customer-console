@@ -6,7 +6,7 @@ import { KeyRow } from "./KeyRow"
 import { Loading } from "./ui"
 
 type Props = {
-  /** The node the service account was born at. */
+  /** The node the service account belongs to. */
   path: string
   serviceAccountId: string
 }

@@ -466,10 +466,48 @@ textarea {
   }
 }
 
-/* ---------- org switcher ---------- */
+/* ---------- switchers: the org, and each level below it ---------- */
+
+.chain {
+  display: grid;
+  gap: 0.375rem;
+}
 
 .switcher {
   position: relative;
+}
+
+/* A level below the org hangs off the one above, like a directory tree. */
+.switcher.level {
+  margin-left: calc(0.875rem * var(--depth, 1));
+}
+
+.switcher.level-1 {
+  --depth: 1;
+}
+
+.switcher.level-2 {
+  --depth: 2;
+}
+
+.switcher.level::before {
+  content: "";
+  position: absolute;
+  left: -0.5rem;
+  top: -0.375rem;
+  width: 0.5rem;
+  height: calc(50% + 0.375rem);
+  border-left: 1px solid var(--rule-strong);
+  border-bottom: 1px solid var(--rule-strong);
+  border-bottom-left-radius: 4px;
+}
+
+.switcher.level .switcher-button {
+  padding: 0.375rem 0.625rem;
+}
+
+.switcher.level .switcher-button small {
+  margin-bottom: 1px;
 }
 
 .switcher-button {
