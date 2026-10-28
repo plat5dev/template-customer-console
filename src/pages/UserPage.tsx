@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react"
+import { useLocation } from "react-router-dom"
 import { api } from "../api/endpoints"
 import type { AuditEvent, Profile, User } from "../api/types"
 import { useAuth } from "../auth/AuthContext"
@@ -8,10 +9,15 @@ import { ErrorAlert } from "../components/ErrorAlert"
 import { Loading, PageHead, Status } from "../components/ui"
 import { useOrgs } from "../org/OrgsContext"
 
-/** You, as a person: your account, this app's profile, and what you did on your own routes. */
+/**
+ * You, as a person: your account, this app's profile, and what you did on your own
+ * routes. At `#delete-account` (the profile menu's "Delete account") it asks to delete
+ * the account once loaded.
+ */
 export function UserPage() {
   const { logout } = useAuth()
   const { orgs } = useOrgs()
+  const location = useLocation()
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [bio, setBio] = useState("")
@@ -49,7 +55,7 @@ export function UserPage() {
     void loadEvents()
   }, [loadEvents])
 
-  async function onDeleteAccount() {
+  const onDeleteAccount = useCallback(async () => {
     if (!confirm("Delete your account? You leave every organization, and your keys stop working.")) return
     setError(null)
     try {
@@ -58,7 +64,11 @@ export function UserPage() {
     } catch (err) {
       setError(err)
     }
-  }
+  }, [logout])
+
+  useEffect(() => {
+    if (!loading && location.hash === "#delete-account") void onDeleteAccount()
+  }, [loading, location.hash, location.key, onDeleteAccount])
 
   async function onSaveProfile(e: FormEvent) {
     e.preventDefault()

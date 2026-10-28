@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react"
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { api } from "../api/endpoints"
 import { nodeHome, nodePath } from "../api/tree"
@@ -17,6 +17,7 @@ export function OrgsPage() {
   const { orgs, refresh, loading, error: loadError } = useOrgs()
   const location = useLocation()
   const navigate = useNavigate()
+  const nameInput = useRef<HTMLInputElement>(null)
   const [name, setName] = useState("")
   const [creating, setCreating] = useState(false)
   const [deleted, setDeleted] = useState<Node[]>([])
@@ -30,6 +31,11 @@ export function OrgsPage() {
   useEffect(() => {
     loadDeleted().catch(setError)
   }, [loadDeleted])
+
+  // The scope bar's "Create organization" opens here, at #create, on every visit.
+  useEffect(() => {
+    if (location.hash === "#create") nameInput.current!.focus()
+  }, [location.hash, location.key])
 
   useEffect(() => {
     if (loading) return
@@ -153,6 +159,7 @@ export function OrgsPage() {
             <div className="field">
               <label htmlFor="org_name">Name</label>
               <input
+                ref={nameInput}
                 id="org_name"
                 className="input"
                 value={name}
@@ -160,7 +167,6 @@ export function OrgsPage() {
                 required
                 maxLength={128}
                 placeholder="Acme"
-                autoFocus={location.hash === "#create"}
               />
               <span className="hint">You get the creator's role in it. Its slug comes from the name.</span>
             </div>

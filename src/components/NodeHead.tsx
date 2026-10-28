@@ -1,11 +1,9 @@
 import type { ReactNode } from "react"
-import { Link } from "react-router-dom"
-import { KINDS } from "../api/tree"
-import { useNodeViews } from "../org/nodeView"
+import { useNodeView } from "../org/nodeView"
 import { PageHead } from "./ui"
 import { YourAccess } from "./YourAccess"
 
-/** A page's head inside a node: crumbs up the chain, the gateway path, and your access here. */
+/** A page's head inside a node: the gateway path, and your access here. The scope bar is above it. */
 export function NodeHead({
   title,
   section,
@@ -18,21 +16,9 @@ export function NodeHead({
   lede?: ReactNode
   actions?: ReactNode
 }) {
-  const views = useNodeViews()
-  const view = views[views.length - 1]!
+  const view = useNodeView()
   return (
     <PageHead
-      crumbs={
-        views.length > 1 && (
-          <>
-            {views.map((v) => (
-              <Link key={v.path} to={`${v.path}/${KINDS[v.kind]!.home}`}>
-                {v.name}
-              </Link>
-            ))}
-          </>
-        )
-      }
       eyebrow={
         <>
           {view.path}

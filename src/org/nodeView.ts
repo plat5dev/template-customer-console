@@ -18,6 +18,12 @@ export type NodeView = {
 /** The chain of nodes in view, root first. */
 export const ScopeContext = createContext<NodeView[]>([])
 
+/**
+ * Where each level reports its view once loaded, by depth (the org is 0), and null when
+ * it unmounts: the scope bar and the last scope sit outside the routes, in the layout.
+ */
+export const ReportContext = createContext<(depth: number, view: NodeView | null) => void>(() => {})
+
 /** Every node in view, root first: the org, then the project, then the environment. */
 export function useNodeViews(): NodeView[] {
   return useContext(ScopeContext)

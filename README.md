@@ -34,16 +34,16 @@ cors:
 
 ```
 src/
-  pages/        one per route (App.tsx); Layout.tsx is the sidebar
+  pages/        one per route (App.tsx)
   styles/       tokens.css (colors, type, the accent) and ui.css (components)
   api/          endpoints.ts: every call; tree.ts: the kinds, paths and default permissions
   auth/         sign-in (PKCE), the token, the pending invite
-  org/          the org switcher's list, and the node in view (NodeScope)
-  components/   panels the pages share
+  org/          the node in view (NodeScope), the organizations list, the last scope
+  components/   Layout.tsx (the sidebar), ScopeBar.tsx, ProfileMenu.tsx, and panels the pages share
   learn/        the "How it works" page, and two probes
 ```
 
-The app's paths are the gateway's, by slug: `/user`, `/user/keys`, `/orgs/{organization}/…`, `/orgs/{organization}/projects/{project}/…` and `…/envs/{environment}/…`, with each section a sub-path (`members`, `bindings`, `service-accounts`, `invites`, `audit-events`, `settings`). `src/api/tree.ts` holds the kinds as `plat5.yml` declares them (`organization` at `/orgs`, `project` at `/projects`, `environment` at `/envs`), with how the app shows each: its home page, its names, and whether service accounts and invites belong there. `src/App.tsx` builds each kind's routes from it, and the sidebar its switchers and pages; change it with the kinds.
+The app's paths are the gateway's, by slug: `/user`, `/user/keys`, `/orgs/{organization}/…`, `/orgs/{organization}/projects/{project}/…` and `…/envs/{environment}/…`, with each section a sub-path (`members`, `bindings`, `service-accounts`, `invites`, `audit-events`, `settings`). `src/api/tree.ts` holds the kinds as `plat5.yml` declares them (`organization` at `/orgs`, `project` at `/projects`, `environment` at `/envs`), with how the app shows each: its home page, its names, whether service accounts and invites belong there, and whether the scope bar sets it apart. `src/App.tsx` builds each kind's routes from it, the scope bar its levels, and the sidebar each kind's pages; change it with the kinds.
 
 To add a page: a file in `src/pages/`, a route in `src/App.tsx`, a link in `src/components/Layout.tsx`. A page inside a node reads it with `useNodeView()` (`src/org/nodeView.ts`): its path, and your membership there. `NodeScope` loads it, at each kind's level of the routes.
 
@@ -70,9 +70,15 @@ Sign in → Auth password UI (locally, the seeded `dev@example.com` / `password`
 
 **The person.** `GET /user` is the account; the name comes from the IdP's name claim, so the app doesn't edit it. `DELETE /user` deletes the account. `/user/keys` are personal keys, sent as `Authorization: Bearer` too. `GET /user/audit-events` is the person's own log. The profile (`/user/profile`, a bio) is your API's.
 
-**Orgs.** The switcher is `GET /user/nodes?kind=organization`; each node carries its `ancestors`, and the app builds its links from them. `POST /orgs` creates one. Deleted orgs are `GET /user/nodes?kind=organization&status=deleted`, restorable until `purge_after` with `POST /orgs/{organization}/restore`. Projects and environments in orgs the person can't open (a guest's) are `GET /user/nodes`, every kind, showing the highest node on each path.
+**Orgs.** The organizations list and the org switcher are `GET /user/nodes?kind=organization`; each node carries its `ancestors`, and the app builds its links from them. `POST /orgs` creates one. Deleted orgs are `GET /user/nodes?kind=organization&status=deleted`, restorable until `purge_after` with `POST /orgs/{organization}/restore`. Projects and environments in orgs the person can't open (a guest's) are `GET /user/nodes`, every kind, showing the highest node on each path.
 
-**Where you are.** The sidebar is a chain of switchers, one per kind: the org, then a project in it, then an environment in that, each a menu of the ones you can see. Below them are the pages of the innermost node in the path. Picking the one you're in opens it, which is how you go back up a level.
+**The scope bar.** Above each page inside a node, a segment per level of the path: `Acme ▾ / Web ▾ / live ▾`. The current node's name comes from its `GET`, the names above it from its `ancestors`. A level is readable when its own `GET …/membership` grants the kind's read permission (or `*`): its name links to its overview, and ▾ opens its siblings, read when the menu opens (orgs from `GET /user/nodes?kind=organization`, projects and environments from the parent's list), with a search box past 8, "Create …" where you may create one (an org always; below, with the parent's `…:create`), and "View all", the parent's list (your organizations when you can't read the parent, as a guest). A level you can't read, like a guest's org, is its name alone, and the app calls nothing under it that would refuse. Picking a sibling keeps your place: each level below, by slug, from the sibling's lists, and the page; with one missing there, the sibling's overview. The environment's segment is set apart (`marked` in `src/api/tree.ts`). At phone width the bar shows the current level, after a "…" menu of the levels above.
+
+**The sidebar** has the wordmark, which opens your organizations from anywhere, the pages of the innermost node in the path (outside a node, the organizations list), and at its foot "How it works", the theme switch, and you.
+
+**The profile menu** opens from your name at the sidebar's foot (`GET /user`): Profile, Personal keys, Redeem an invite (paste an invite link or its token: `POST /user/invites/redeem`, then the node it names opens), Sign out, and Delete account, which asks on the Profile page.
+
+**Landing.** `/` opens the last node you were in and could read, kept in `localStorage` as `plat5.customer-console.last-scope`: the app `GET`s it and opens its overview. If that fails, or the node is deleted, the app forgets it and shows your organizations, as it does with nothing stored.
 
 **What you can do here.** Each node's pages load `GET …/membership`: your member id (to mark "you"), your roles there (badges, and "Guest" for a guest), and your permissions. Buttons for routes your permissions don't reach are hidden or disabled; the gateway still decides. The permission names are identity's and audit's defaults, in `src/api/tree.ts`.
 

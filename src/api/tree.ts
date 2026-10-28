@@ -17,6 +17,8 @@ type Kind = {
   /** Display names, singular and plural. */
   label: string
   plural: string
+  /** Whether the scope bar sets the level apart: the environment, whose data your API serves. */
+  marked: boolean
   /**
    * Whether service accounts belong at this kind. The starters' services/identity.yml
    * turns them off at projects: they belong to an org, for automation across it, or to
@@ -50,6 +52,7 @@ export const KINDS: Record<string, Kind> = {
     permissionName: "organization",
     label: "Organization",
     plural: "Organizations",
+    marked: false,
     serviceAccounts: true,
     invites: true,
     bindings: true,
@@ -62,6 +65,7 @@ export const KINDS: Record<string, Kind> = {
     permissionName: "project",
     label: "Project",
     plural: "Projects",
+    marked: false,
     serviceAccounts: false,
     invites: true,
     bindings: true,
@@ -74,6 +78,7 @@ export const KINDS: Record<string, Kind> = {
     permissionName: "project",
     label: "Environment",
     plural: "Environments",
+    marked: true,
     serviceAccounts: true,
     invites: false,
     bindings: false,
@@ -110,6 +115,23 @@ export function nodePath(node: Node): string {
 /** Where a node opens in this app: its children, or an environment's tasks. */
 export function nodeHome(node: Node): string {
   return `${nodePath(node)}/${KINDS[node.kind]!.home}`
+}
+
+/** A node a path names: its kind, slug and path. */
+export type Level = { kind: string; slug: string; path: string }
+
+/** The nodes a path names, root first: `/orgs/acme/projects/web/…` is the org, then the project. */
+export function chainFromPath(pathname: string): Level[] {
+  const parts = pathname.split("/").filter(Boolean)
+  const out: Level[] = []
+  let path = ""
+  for (const [i, kind] of CHAIN.entries()) {
+    const collection = KINDS[kind]!.collection
+    if (parts[i * 2] !== collection || !parts[i * 2 + 1]) break
+    path += `/${collection}/${parts[i * 2 + 1]}`
+    out.push({ kind, slug: parts[i * 2 + 1]!, path })
+  }
+  return out
 }
 
 /** Each ancestor of a node with its path, root first. */

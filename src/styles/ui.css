@@ -405,8 +405,10 @@ textarea {
 }
 
 @media (max-width: 860px) {
+  /* The bar above, the menu bar, then the page, which takes the height that's left. */
   .shell {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
   }
 
   .mobile-bar {
@@ -466,48 +468,10 @@ textarea {
   }
 }
 
-/* ---------- switchers: the org, and each level below it ---------- */
-
-.chain {
-  display: grid;
-  gap: 0.375rem;
-}
+/* ---------- switchers and menus: a button, and the menu it opens ---------- */
 
 .switcher {
   position: relative;
-}
-
-/* A level below the org hangs off the one above, like a directory tree. */
-.switcher.level {
-  margin-left: calc(0.875rem * var(--depth, 1));
-}
-
-.switcher.level-1 {
-  --depth: 1;
-}
-
-.switcher.level-2 {
-  --depth: 2;
-}
-
-.switcher.level::before {
-  content: "";
-  position: absolute;
-  left: -0.5rem;
-  top: -0.375rem;
-  width: 0.5rem;
-  height: calc(50% + 0.375rem);
-  border-left: 1px solid var(--rule-strong);
-  border-bottom: 1px solid var(--rule-strong);
-  border-bottom-left-radius: 4px;
-}
-
-.switcher.level .switcher-button {
-  padding: 0.375rem 0.625rem;
-}
-
-.switcher.level .switcher-button small {
-  margin-bottom: 1px;
 }
 
 .switcher-button {
@@ -559,6 +523,10 @@ textarea {
   border-right: 1.5px solid var(--muted);
   border-bottom: 1.5px solid var(--muted);
   transform: translateY(-2px) rotate(45deg);
+}
+
+.chevron.up {
+  transform: translateY(2px) rotate(-135deg);
 }
 
 .menu {
@@ -617,6 +585,227 @@ textarea {
   margin: 0.25rem 0;
   border: 0;
   border-top: 1px solid var(--rule);
+}
+
+/* The items, below a menu's search box or error. */
+.menu-list {
+  display: grid;
+  gap: 1px;
+}
+
+/* A menu as wide as its items, from where its button is. Menu.tsx keeps it on screen. */
+.menu-pop {
+  right: auto;
+  width: max-content;
+  min-width: 12rem;
+  max-width: min(20rem, calc(100vw - 2rem));
+}
+
+/* A menu that opens above its button, at the sidebar's foot. */
+.menu-up {
+  top: auto;
+  bottom: calc(100% + 0.25rem);
+}
+
+.menu-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin-bottom: 0.25rem;
+}
+
+/* A note at an item's end: the kind of a level. */
+.menu-item small {
+  margin-left: auto;
+  padding-left: 1rem;
+  font: 0.6875rem/1 var(--font-mono);
+  color: var(--muted);
+}
+
+.menu-item[aria-disabled="true"],
+.menu-item[aria-disabled="true"]:hover {
+  background: none;
+  color: var(--muted);
+  cursor: default;
+}
+
+.menu-item.danger,
+.menu-item.danger:hover {
+  color: var(--danger);
+}
+
+.menu-item.danger:hover {
+  background: var(--danger-wash);
+}
+
+/* ---------- scope bar: where you are, a segment per level ---------- */
+
+.scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  padding-bottom: 0.875rem;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.875rem;
+}
+
+.scope-sep {
+  padding-inline: 0.125rem;
+  color: var(--rule-strong);
+}
+
+.scope-seg {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+}
+
+/* A level you can't read is its name alone. */
+.scope-label {
+  max-width: 16rem;
+  padding: 0.1875rem 0.375rem;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+a.scope-label {
+  color: var(--text);
+  font-weight: 500;
+}
+
+a.scope-label:hover {
+  text-decoration: none;
+  background: var(--surface-2);
+}
+
+.scope-switch {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.25rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.scope-switch:hover,
+.scope-switch[aria-expanded="true"] {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* The environment: where your API's data is, set apart. */
+.scope-seg.marked {
+  padding-left: 0.25rem;
+  border-radius: 999px;
+  background: var(--accent-wash);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.scope-seg.marked .scope-label {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--accent-text);
+}
+
+.scope-seg.marked a.scope-label:hover,
+.scope-seg.marked .scope-switch:hover,
+.scope-seg.marked .scope-switch[aria-expanded="true"] {
+  border-radius: 999px;
+  background: var(--accent-wash);
+}
+
+.scope-seg.marked .chevron {
+  border-color: var(--accent-text);
+}
+
+/* The levels above the current one, for phone width. */
+.scope-up {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .scope {
+    flex-wrap: nowrap;
+  }
+
+  .scope-up {
+    display: block;
+    flex: none;
+  }
+
+  .scope-seg:not(.current),
+  .scope-sep:not(.to-current) {
+    display: none;
+  }
+
+  .scope-label {
+    max-width: none;
+  }
+}
+
+/* ---------- profile: you, at the sidebar's foot ---------- */
+
+.side-foot > .nav-group,
+.side-foot > .profile {
+  margin-inline: -0.5rem;
+}
+
+.me-button {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-size: 0.875rem;
+  color: var(--text-2);
+  text-align: left;
+  cursor: pointer;
+}
+
+.me-button:hover,
+.me-button[aria-expanded="true"] {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.me-button .grow {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- dialog ---------- */
+
+.dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  max-width: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+}
+
+.dialog::backdrop {
+  background: rgb(15 16 19 / 0.4);
+}
+
+.dialog > .card {
+  box-shadow: var(--shadow);
 }
 
 /* ---------- theme switch ---------- */

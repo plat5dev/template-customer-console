@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import { api } from "../api/endpoints"
 import { DEFAULT_ENVIRONMENTS, KINDS, nodeHome, nodePath, permission } from "../api/tree"
 import type { Node } from "../api/types"
@@ -10,11 +10,13 @@ import { useNodeView } from "../org/nodeView"
 
 /**
  * A node's children of one kind: an org's projects, a project's environments. The ones
- * you can see, a create form, and the deleted ones to restore.
+ * you can see, a create form (at `#create`), and the deleted ones to restore.
  */
 export function ChildrenPage({ kind }: { kind: string }) {
   const parent = useNodeView()
   const navigate = useNavigate()
+  const location = useLocation()
+  const nameInput = useRef<HTMLInputElement>(null)
   const { collection, label, plural } = KINDS[kind]!
   const noun = label.toLowerCase()
   const nouns = plural.toLowerCase()
@@ -50,6 +52,11 @@ export function ChildrenPage({ kind }: { kind: string }) {
   useEffect(() => {
     if (showDeleted) void loadDeleted()
   }, [showDeleted, loadDeleted])
+
+  // The scope bar's "Create …" opens here, at #create, on every visit.
+  useEffect(() => {
+    if (location.hash === "#create") nameInput.current!.focus()
+  }, [location.hash, location.key])
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
@@ -152,7 +159,7 @@ export function ChildrenPage({ kind }: { kind: string }) {
             ))}
         </section>
 
-        <form className="card" onSubmit={(e) => void onCreate(e)}>
+        <form id="create" className="card" onSubmit={(e) => void onCreate(e)}>
           <div className="card-head">
             <h2>New {noun}</h2>
           </div>
@@ -160,6 +167,7 @@ export function ChildrenPage({ kind }: { kind: string }) {
             <div className="field">
               <label htmlFor="child_name">Name</label>
               <input
+                ref={nameInput}
                 id="child_name"
                 className="input"
                 value={name}

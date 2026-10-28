@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from "react"
 import { api } from "../api/endpoints"
 import { ApiError } from "../api/client"
+import { chainFromPath } from "../api/tree"
 import { ErrorAlert } from "../components/ErrorAlert"
-import { useOrgs } from "../org/OrgsContext"
+import { lastScope } from "../org/lastScope"
 
 async function runProbe(path: string, key: string): Promise<string> {
   try {
@@ -25,9 +26,8 @@ async function runProbe(path: string, key: string): Promise<string> {
 
 /** Paste any key and call a path with it, or call a user route and an org route. */
 export function KeyProbe() {
-  const { lastOrg } = useOrgs()
-  // The org you opened last, else the one plat5 start seeds.
-  const org = `/orgs/${lastOrg ?? "dev"}`
+  // The org of the scope you were in last, else the one plat5 start seeds.
+  const org = chainFromPath(lastScope() ?? "")[0]?.path ?? "/orgs/dev"
   const [key, setKey] = useState("")
   const [path, setPath] = useState("/user")
   const [running, setRunning] = useState(false)

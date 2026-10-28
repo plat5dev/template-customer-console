@@ -1,16 +1,16 @@
-import { useCallback, useContext, useEffect, useState } from "react"
+import { useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { Link, Outlet, useParams } from "react-router-dom"
 import { api } from "../api/endpoints"
 import { holds, KINDS, permission } from "../api/tree"
 import type { Membership, Node } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { Loading } from "../components/ui"
-import { ScopeContext, type NodeView } from "./nodeView"
+import { ReportContext, ScopeContext, type NodeView } from "./nodeView"
 
 /**
  * A route level for one kind: reads the node's slug from the path, loads the
- * caller's membership there (and the node, when they may read it), and renders
- * the pages below with it.
+ * caller's membership there (and the node, when they may read it), renders the
+ * pages below with it, and reports it to the layout.
  */
 export function NodeScope({ kind, param }: { kind: string; param: string }) {
   const parents = useContext(ScopeContext)
@@ -35,6 +35,29 @@ function Loaded({ kind, slug, path, parents }: { kind: string; slug: string; pat
     reload().catch(setError)
   }, [reload])
 
+  const view = useMemo<NodeView | null>(
+    () =>
+      membership && {
+        kind,
+        slug,
+        path,
+        node,
+        membership,
+        name: node?.display_name ?? slug,
+        can: (p) => holds(membership.permissions, p),
+        reload,
+      },
+    [kind, slug, path, node, membership, reload],
+  )
+
+  const report = useContext(ReportContext)
+  const depth = parents.length
+  useEffect(() => {
+    if (!view) return
+    report(depth, view)
+    return () => report(depth, null)
+  }, [report, depth, view])
+
   if (error) {
     return (
       <div className="stack narrow">
@@ -43,18 +66,8 @@ function Loaded({ kind, slug, path, parents }: { kind: string; slug: string; pat
       </div>
     )
   }
-  if (!membership) return <Loading />
+  if (!view) return <Loading />
 
-  const view: NodeView = {
-    kind,
-    slug,
-    path,
-    node,
-    membership,
-    name: node?.display_name ?? slug,
-    can: (p) => holds(membership.permissions, p),
-    reload,
-  }
   return (
     <ScopeContext.Provider value={[...parents, view]}>
       <Outlet />
