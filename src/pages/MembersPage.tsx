@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { Link } from "react-router-dom"
 import { api } from "../api/endpoints"
-import { permission } from "../api/tree"
 import type { Member, Role } from "../api/types"
 import { config } from "../config"
 import { ErrorAlert } from "../components/ErrorAlert"
@@ -11,6 +10,7 @@ import { NodeHead } from "../components/NodeHead"
 import { RoleSelect } from "../components/RoleSelect"
 import { Loading } from "../components/ui"
 import { useNodeView } from "../org/nodeView"
+import { useRouteChecks } from "../org/routeChecks"
 
 /** Everyone who can reach the org: its members, guests and service accounts marked. */
 export function MembersPage() {
@@ -22,28 +22,38 @@ export function MembersPage() {
   const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<unknown>(null)
+  const [failed, setFailed] = useState(false)
 
-  const canRead = org.can(permission.bindingsRead(org.kind))
-  const canWrite = org.can(permission.bindingsWrite(org.kind))
+  // Remove is asked on the first person other than you.
+  const other = members?.find((m) => m.principal === "person" && m.id !== org.membership.member_id)
+  const can = useRouteChecks(
+    {
+      add: { method: "POST", path: `${org.path}/members` },
+      remove: other && { method: "DELETE", path: `${org.path}/members/${other.id}` },
+      roles: { method: "GET", path: `${org.path}/roles` },
+    },
+    members !== null,
+  )
 
   const load = useCallback(async () => {
     try {
       setMembers(await api.listMembers(org.path))
     } catch (e) {
       setError(e)
+      setFailed(true)
       setMembers([])
     }
   }, [org.path])
 
   useEffect(() => {
-    if (!canRead) return
     void load()
-  }, [canRead, load])
+  }, [load])
 
+  const pickRoles = can.add && can.roles
   useEffect(() => {
-    if (!canWrite) return
+    if (!pickRoles) return
     api.listRoles(org.path).then((r) => setRoles(r.roles), setError)
-  }, [canWrite, org.path])
+  }, [pickRoles, org.path])
 
   async function onAdd(e: FormEvent) {
     e.preventDefault()
@@ -80,11 +90,7 @@ export function MembersPage() {
       <NodeHead title="Members" section="members" />
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
 
-      {!canRead ? (
-        <div className="alert alert-warn">
-          You can't list the members (needs <code>{permission.bindingsRead(org.kind)}</code>).
-        </div>
-      ) : (
+      {!failed && (
         <div className="split">
           <section className="stack-sm">
             {members === null ? (
@@ -131,7 +137,7 @@ export function MembersPage() {
                                 Service accounts
                               </Link>
                             ) : (
-                              canWrite && (
+                              can.remove && (
                                 <button
                                   type="button"
                                   className="btn btn-sm btn-ghost"
@@ -156,37 +162,38 @@ export function MembersPage() {
             </p>
           </section>
 
-          <form className="card" onSubmit={(e) => void onAdd(e)}>
-            <div className="card-head">
-              <h2>Add a person</h2>
-            </div>
-            <div className="card-body">
-              <div className="field">
-                <label htmlFor="member_subject">IdP subject</label>
-                <input
-                  id="member_subject"
-                  className="input mono"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  required
-                  placeholder="from their Profile page"
-                />
-                <span className="hint">On this app's issuer. They're a member right away.</span>
+          {can.add && (
+            <form className="card" onSubmit={(e) => void onAdd(e)}>
+              <div className="card-head">
+                <h2>Add a person</h2>
               </div>
-              <div className="field">
-                <label htmlFor="member_role">Role</label>
-                <RoleSelect id="member_role" roles={roles} value={role} onChange={setRole} />
+              <div className="card-body">
+                <div className="field">
+                  <label htmlFor="member_subject">IdP subject</label>
+                  <input
+                    id="member_subject"
+                    className="input mono"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    required
+                    placeholder="from their Profile page"
+                  />
+                  <span className="hint">On this app's issuer. They're a member right away.</span>
+                </div>
+                <div className="field">
+                  <label htmlFor="member_role">Role</label>
+                  <RoleSelect id="member_role" roles={roles} value={role} onChange={setRole} />
+                </div>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={adding || !subject.trim() || !role}
+                >
+                  {adding ? "Adding…" : "Add member"}
+                </button>
               </div>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={adding || !subject.trim() || !role || !canWrite}
-                title={canWrite ? undefined : `Needs ${permission.bindingsWrite(org.kind)}`}
-              >
-                {adding ? "Adding…" : "Add member"}
-              </button>
-            </div>
-          </form>
+            </form>
+          )}
         </div>
       )}
     </>

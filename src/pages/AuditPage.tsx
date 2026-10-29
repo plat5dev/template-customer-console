@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
 import { api } from "../api/endpoints"
-import { permission } from "../api/tree"
 import type { AuditEvent } from "../api/types"
 import { AuditEventRow } from "../components/AuditEventRow"
 import { ErrorAlert } from "../components/ErrorAlert"
@@ -8,6 +7,7 @@ import { memberName } from "../components/names"
 import { NodeHead } from "../components/NodeHead"
 import { Loading } from "../components/ui"
 import { useNodeView, useRootView } from "../org/nodeView"
+import { useRouteChecks } from "../org/routeChecks"
 import { useMembers } from "../org/useMembers"
 
 /** A node's audit log, and everything below it: who did what, and how it ended. */
@@ -19,7 +19,8 @@ export function AuditPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<unknown>(null)
 
-  const allowed = view.can(permission.auditRead())
+  // Nothing to do here but read, so the batch is the sidebar's.
+  useRouteChecks({})
   const actors = useMembers(root.path, events?.map((e) => e.actor.member_id) ?? [])
 
   const load = useCallback(
@@ -41,8 +42,8 @@ export function AuditPage() {
   )
 
   useEffect(() => {
-    if (allowed) void load()
-  }, [allowed, load])
+    void load()
+  }, [load])
 
   function actor(e: AuditEvent): string {
     const id = e.actor.member_id
@@ -64,18 +65,12 @@ export function AuditPage() {
         }
       />
 
-      {!allowed ? (
-        <div className="alert alert-warn">
-          You can't read the audit log here (needs <code>{permission.auditRead()}</code>).
-        </div>
-      ) : (
-        <>
           <ErrorAlert error={error} onDismiss={() => setError(null)} />
           {events === null ? (
             <Loading />
           ) : (
             <div className="list">
-              {events.length === 0 && <div className="empty">No events yet.</div>}
+              {events.length === 0 && !error && <div className="empty">No events yet.</div>}
               {events.map((e) => (
                 <AuditEventRow key={e.id} event={e} actor={actor(e)} />
               ))}
@@ -93,8 +88,6 @@ export function AuditPage() {
               </button>
             </div>
           )}
-        </>
-      )}
     </>
   )
 }

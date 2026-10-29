@@ -7,6 +7,7 @@ import { ErrorAlert } from "../components/ErrorAlert"
 import { initials } from "../components/initials"
 import { Loading, PageHead, Status } from "../components/ui"
 import { useOrgs } from "../org/OrgsContext"
+import { useRouteChecks } from "../org/routeChecks"
 
 /**
  * The orgs you can see, a create form, the deleted ones you can restore, and
@@ -23,19 +24,31 @@ export function OrgsPage() {
   const [deleted, setDeleted] = useState<Node[]>([])
   const [guestNodes, setGuestNodes] = useState<Node[]>([])
   const [error, setError] = useState<unknown>(null)
+  const [deletedLoaded, setDeletedLoaded] = useState(false)
+
+  // Restore is asked on the first deleted org.
+  const can = useRouteChecks(
+    {
+      create: { method: "POST", path: "/orgs" },
+      restore: deleted[0] && { method: "POST", path: `${nodePath(deleted[0])}/restore` },
+    },
+    deletedLoaded,
+  )
 
   const loadDeleted = useCallback(async () => {
     setDeleted(await api.listMyNodes("organization", true))
   }, [])
 
   useEffect(() => {
-    loadDeleted().catch(setError)
+    loadDeleted()
+      .catch(setError)
+      .finally(() => setDeletedLoaded(true))
   }, [loadDeleted])
 
   // The scope bar's "Create organization" opens here, at #create, on every visit.
   useEffect(() => {
-    if (location.hash === "#create") nameInput.current!.focus()
-  }, [location.hash, location.key])
+    if (location.hash === "#create") nameInput.current?.focus()
+  }, [location.hash, location.key, can.create])
 
   useEffect(() => {
     if (loading) return
@@ -88,7 +101,7 @@ export function OrgsPage() {
             <Loading />
           ) : (
             <div className="list">
-              {orgs.length === 0 && <div className="empty">No organizations yet. Create one.</div>}
+              {orgs.length === 0 && <div className="empty">No organizations yet.</div>}
               {orgs.map((o) => (
                 <div key={o.id} className="list-item">
                   <div className="who">
@@ -141,9 +154,11 @@ export function OrgsPage() {
                       </span>
                       <div className="list-meta">Restorable until {new Date(o.purge_after!).toLocaleString()}</div>
                     </div>
-                    <button type="button" className="btn btn-sm" onClick={() => void onRestore(o)}>
-                      Restore
-                    </button>
+                    {can.restore && (
+                      <button type="button" className="btn btn-sm" onClick={() => void onRestore(o)}>
+                        Restore
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -151,30 +166,32 @@ export function OrgsPage() {
           )}
         </section>
 
-        <form id="create" className="card" onSubmit={(e) => void onCreate(e)}>
-          <div className="card-head">
-            <h2>New organization</h2>
-          </div>
-          <div className="card-body">
-            <div className="field">
-              <label htmlFor="org_name">Name</label>
-              <input
-                ref={nameInput}
-                id="org_name"
-                className="input"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                maxLength={128}
-                placeholder="Acme"
-              />
-              <span className="hint">You get the creator's role in it. Its slug comes from the name.</span>
+        {can.create && (
+          <form id="create" className="card" onSubmit={(e) => void onCreate(e)}>
+            <div className="card-head">
+              <h2>New organization</h2>
             </div>
-            <button type="submit" className="btn btn-primary" disabled={creating || !name.trim()}>
-              {creating ? "Creating…" : "Create organization"}
-            </button>
-          </div>
-        </form>
+            <div className="card-body">
+              <div className="field">
+                <label htmlFor="org_name">Name</label>
+                <input
+                  ref={nameInput}
+                  id="org_name"
+                  className="input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  maxLength={128}
+                  placeholder="Acme"
+                />
+                <span className="hint">You get the creator's role in it. Its slug comes from the name.</span>
+              </div>
+              <button type="submit" className="btn btn-primary" disabled={creating || !name.trim()}>
+                {creating ? "Creating…" : "Create organization"}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </>
   )

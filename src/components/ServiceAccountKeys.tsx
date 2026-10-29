@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react"
 import { api } from "../api/endpoints"
 import type { CreatedKey, Key } from "../api/types"
+import { useRouteChecks } from "../org/routeChecks"
 import { ErrorAlert } from "./ErrorAlert"
 import { KeyRow } from "./KeyRow"
 import { Loading } from "./ui"
@@ -9,10 +10,15 @@ type Props = {
   /** The node the service account belongs to. */
   path: string
   serviceAccountId: string
+  /** Whether the page's route checks allow creating a key. */
+  canCreate: boolean
 }
 
-/** A service account's keys. Each is shown once, and sent as `Authorization: Bearer`. */
-export function ServiceAccountKeys({ path, serviceAccountId }: Props) {
+/**
+ * A service account's keys. Each is shown once, and sent as `Authorization: Bearer`.
+ * Its rows load here, so Revoke is asked here, on the first key that works, once they're in.
+ */
+export function ServiceAccountKeys({ path, serviceAccountId, canCreate }: Props) {
   const [keys, setKeys] = useState<Key[]>([])
   const [name, setName] = useState("")
   const [loading, setLoading] = useState(true)
@@ -21,6 +27,11 @@ export function ServiceAccountKeys({ path, serviceAccountId }: Props) {
   const [created, setCreated] = useState<CreatedKey | null>(null)
 
   const nameId = `sa_key_name_${serviceAccountId}`
+  const live = keys.find((k) => !k.revoked_at)
+  const can = useRouteChecks(
+    { revoke: live && { method: "DELETE", path: `${path}/service-accounts/${serviceAccountId}/keys/${live.id}` } },
+    !loading,
+  )
 
   async function load() {
     setLoading(true)
@@ -112,29 +123,31 @@ export function ServiceAccountKeys({ path, serviceAccountId }: Props) {
         <div className="list flush">
           {keys.length === 0 && <div className="empty" style={{ padding: 0 }}>No keys.</div>}
           {keys.map((k) => (
-            <KeyRow key={k.id} k={k} onRevoke={() => void onRevoke(k.id)} />
+            <KeyRow key={k.id} k={k} onRevoke={can.revoke ? () => void onRevoke(k.id) : undefined} />
           ))}
         </div>
       )}
 
-      <form className="form-row" onSubmit={(e) => void onCreate(e)}>
-        <div className="field">
-          <label htmlFor={nameId} className="small">
-            New key name
-          </label>
-          <input
-            id={nameId}
-            className="input input-sm"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={128}
-            placeholder="deploy-ci"
-          />
-        </div>
-        <button type="submit" className="btn btn-sm" disabled={creating}>
-          {creating ? "Creating…" : "Create key"}
-        </button>
-      </form>
+      {canCreate && (
+        <form className="form-row" onSubmit={(e) => void onCreate(e)}>
+          <div className="field">
+            <label htmlFor={nameId} className="small">
+              New key name
+            </label>
+            <input
+              id={nameId}
+              className="input input-sm"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={128}
+              placeholder="deploy-ci"
+            />
+          </div>
+          <button type="submit" className="btn btn-sm" disabled={creating}>
+            {creating ? "Creating…" : "Create key"}
+          </button>
+        </form>
+      )}
     </div>
   )
 }

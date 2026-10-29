@@ -1,8 +1,8 @@
 import type { Key } from "../api/types"
 import { Status } from "./ui"
 
-/** One API key in a list: name, prefix, dates, and Revoke while it works. */
-export function KeyRow({ k, onRevoke }: { k: Key; onRevoke: () => void }) {
+/** One API key in a list: name, prefix, dates, and Revoke while it works, when `onRevoke` is given. */
+export function KeyRow({ k, onRevoke }: { k: Key; onRevoke?: () => void }) {
   return (
     <div className="list-item">
       <div>
@@ -18,7 +18,7 @@ export function KeyRow({ k, onRevoke }: { k: Key; onRevoke: () => void }) {
           {k.revoked_at ? ` · revoked ${new Date(k.revoked_at).toLocaleString()}` : ""}
         </div>
       </div>
-      {!k.revoked_at && (
+      {!k.revoked_at && onRevoke && (
         <button type="button" className="btn btn-sm btn-danger" onClick={onRevoke}>
           Revoke
         </button>

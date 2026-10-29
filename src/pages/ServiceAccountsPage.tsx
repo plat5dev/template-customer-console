@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { Link } from "react-router-dom"
 import { api } from "../api/endpoints"
-import { isRoot, permission } from "../api/tree"
+import { isRoot } from "../api/tree"
 import type { Role, ServiceAccount } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { NodeHead } from "../components/NodeHead"
@@ -9,6 +9,7 @@ import { RoleSelect } from "../components/RoleSelect"
 import { ServiceAccountKeys } from "../components/ServiceAccountKeys"
 import { Loading } from "../components/ui"
 import { useNodeView } from "../org/nodeView"
+import { useRouteChecks } from "../org/routeChecks"
 
 /**
  * Members for machines that belong to this node: CI, a backend job, an integration.
@@ -23,28 +24,41 @@ export function ServiceAccountsPage() {
   const [role, setRole] = useState("")
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<unknown>(null)
+  const [failed, setFailed] = useState(false)
 
-  const canRead = view.can(permission.bindingsRead(view.kind))
-  const canWrite = view.can(permission.bindingsWrite(view.kind))
+  // A row's requests are asked on the first account.
+  const sa = accounts?.[0] ? `${view.path}/service-accounts/${accounts[0].id}` : null
+  const can = useRouteChecks(
+    {
+      create: { method: "POST", path: `${view.path}/service-accounts` },
+      roles: { method: "GET", path: `${view.path}/roles` },
+      rename: sa && { method: "PATCH", path: sa },
+      remove: sa && { method: "DELETE", path: sa },
+      keys: sa && { method: "GET", path: `${sa}/keys` },
+      createKey: sa && { method: "POST", path: `${sa}/keys` },
+    },
+    accounts !== null,
+  )
+  const creatable = can.create && can.roles
 
   const load = useCallback(async () => {
     try {
       setAccounts(await api.listServiceAccounts(view.path))
     } catch (e) {
       setError(e)
+      setFailed(true)
       setAccounts([])
     }
   }, [view.path])
 
   useEffect(() => {
-    if (!canRead) return
     void load()
-  }, [canRead, load])
+  }, [load])
 
   useEffect(() => {
-    if (!canWrite) return
+    if (!creatable) return
     api.listRoles(view.path).then((r) => setRoles(r.roles), setError)
-  }, [canWrite, view.path])
+  }, [creatable, view.path])
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
@@ -90,11 +104,7 @@ export function ServiceAccountsPage() {
       <NodeHead title="Service accounts" section="service-accounts" />
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
 
-      {!canRead ? (
-        <div className="alert alert-warn">
-          You can't list service accounts here (needs <code>{permission.bindingsRead(view.kind)}</code>).
-        </div>
-      ) : (
+      {!failed && (
         <div className="split">
           <section className="stack-sm">
             <p className="section-lede">
@@ -112,66 +122,71 @@ export function ServiceAccountsPage() {
             ) : (
               <div className="list">
                 {accounts.length === 0 && <div className="empty">No service accounts belong here.</div>}
-                {accounts.map((sa) => (
-                  <div key={sa.id} className="list-item stacked">
+                {accounts.map((a) => (
+                  <div key={a.id} className="list-item stacked">
                     <div className="spread">
                       <span className="who">
                         <span className="avatar square">SA</span>
                         <span>
-                          <span className="list-title">{sa.name}</span>
-                          <span className="sub mono">member {sa.id}</span>
+                          <span className="list-title">{a.name}</span>
+                          <span className="sub mono">member {a.id}</span>
                         </span>
                       </span>
-                      {canWrite && (
-                        <span className="cluster">
-                          <button type="button" className="btn btn-sm btn-ghost" onClick={() => void onRename(sa)}>
+                      <span className="cluster">
+                        {can.rename && (
+                          <button type="button" className="btn btn-sm btn-ghost" onClick={() => void onRename(a)}>
                             Rename
                           </button>
-                          <button type="button" className="btn btn-sm btn-danger" onClick={() => void onDelete(sa)}>
+                        )}
+                        {can.remove && (
+                          <button type="button" className="btn btn-sm btn-danger" onClick={() => void onDelete(a)}>
                             Delete
                           </button>
-                        </span>
-                      )}
+                        )}
+                      </span>
                     </div>
-                    {canWrite && <ServiceAccountKeys path={view.path} serviceAccountId={sa.id} />}
+                    {can.keys && (
+                      <ServiceAccountKeys path={view.path} serviceAccountId={a.id} canCreate={can.createKey} />
+                    )}
                   </div>
                 ))}
               </div>
             )}
           </section>
 
-          <form className="card" onSubmit={(e) => void onCreate(e)}>
-            <div className="card-head">
-              <h2>New service account</h2>
-            </div>
-            <div className="card-body">
-              <div className="field">
-                <label htmlFor="sa_name">Name</label>
-                <input
-                  id="sa_name"
-                  className="input"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  maxLength={128}
-                  placeholder="deploy-bot"
-                />
+          {creatable && (
+            <form className="card" onSubmit={(e) => void onCreate(e)}>
+              <div className="card-head">
+                <h2>New service account</h2>
               </div>
-              <div className="field">
-                <label htmlFor="sa_role">Role</label>
-                <RoleSelect id="sa_role" roles={roles} value={role} onChange={setRole} />
-                <span className="hint">Bound on {view.name}. Its own role, not bounded by yours.</span>
+              <div className="card-body">
+                <div className="field">
+                  <label htmlFor="sa_name">Name</label>
+                  <input
+                    id="sa_name"
+                    className="input"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    maxLength={128}
+                    placeholder="deploy-bot"
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="sa_role">Role</label>
+                  <RoleSelect id="sa_role" roles={roles} value={role} onChange={setRole} />
+                  <span className="hint">Bound on {view.name}. Its own role, not bounded by yours.</span>
+                </div>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={creating || !name.trim() || !role}
+                >
+                  {creating ? "Creating…" : "Create service account"}
+                </button>
               </div>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={creating || !name.trim() || !role || !canWrite}
-                title={canWrite ? undefined : `Needs ${permission.bindingsWrite(view.kind)}`}
-              >
-                {creating ? "Creating…" : "Create service account"}
-              </button>
-            </div>
-          </form>
+            </form>
+          )}
         </div>
       )}
     </>

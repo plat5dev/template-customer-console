@@ -9,8 +9,10 @@ export type NodeView = {
   path: string
   /** Null when the caller can't read the node itself, like a guest at the org. */
   node: Node | null
+  /** Who the caller is here: their member id, roles and permissions. */
   membership: Membership
   name: string
+  /** Whether the membership holds a permission: the scope bar's readable levels and "Create …". */
   can: (permission: string) => boolean
   reload: () => Promise<void>
 }

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { api } from "../api/endpoints"
-import { DEFAULT_ENVIRONMENTS, KINDS, nodeHome, nodePath, permission } from "../api/tree"
+import { DEFAULT_ENVIRONMENTS, KINDS, nodeHome, nodePath } from "../api/tree"
 import type { Node } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { NodeHead } from "../components/NodeHead"
 import { Loading, Status } from "../components/ui"
 import { useNodeView } from "../org/nodeView"
+import { useRouteChecks } from "../org/routeChecks"
 
 /**
  * A node's children of one kind: an org's projects, a project's environments. The ones
@@ -26,6 +27,15 @@ export function ChildrenPage({ kind }: { kind: string }) {
   const [name, setName] = useState("")
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<unknown>(null)
+
+  // Its requests, checked once the list is in. Restore is asked once deleted ones show.
+  const can = useRouteChecks(
+    {
+      create: { method: "POST", path: `${parent.path}/${collection}` },
+      restore: deleted?.[0] && { method: "POST", path: `${nodePath(deleted[0])}/restore` },
+    },
+    children !== null,
+  )
 
   const load = useCallback(async () => {
     try {
@@ -55,8 +65,8 @@ export function ChildrenPage({ kind }: { kind: string }) {
 
   // The scope bar's "Create …" opens here, at #create, on every visit.
   useEffect(() => {
-    if (location.hash === "#create") nameInput.current!.focus()
-  }, [location.hash, location.key])
+    if (location.hash === "#create") nameInput.current?.focus()
+  }, [location.hash, location.key, can.create])
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
@@ -93,7 +103,6 @@ export function ChildrenPage({ kind }: { kind: string }) {
     }
   }
 
-  const canCreate = parent.can(permission.create(kind))
 
   return (
     <>
@@ -150,46 +159,49 @@ export function ChildrenPage({ kind }: { kind: string }) {
                         Restorable until {new Date(c.purge_after!).toLocaleString()}
                       </div>
                     </div>
-                    <button type="button" className="btn btn-sm" onClick={() => void onRestore(c)}>
-                      Restore
-                    </button>
+                    {can.restore && (
+                      <button type="button" className="btn btn-sm" onClick={() => void onRestore(c)}>
+                        Restore
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
             ))}
         </section>
 
-        <form id="create" className="card" onSubmit={(e) => void onCreate(e)}>
-          <div className="card-head">
-            <h2>New {noun}</h2>
-          </div>
-          <div className="card-body">
-            <div className="field">
-              <label htmlFor="child_name">Name</label>
-              <input
-                ref={nameInput}
-                id="child_name"
-                className="input"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                maxLength={128}
-              />
-              <span className="hint">
-                Its slug, for the path, comes from the name and never changes.
-                {kind === "project" && ` It starts with ${DEFAULT_ENVIRONMENTS.join(" and ")} environments.`}
-              </span>
+        {can.create && (
+          <form id="create" className="card" onSubmit={(e) => void onCreate(e)}>
+            <div className="card-head">
+              <h2>New {noun}</h2>
             </div>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={creating || !name.trim() || !canCreate}
-              title={canCreate ? undefined : `Needs ${permission.create(kind)}`}
-            >
-              {creating ? "Creating…" : `Create ${noun}`}
-            </button>
-          </div>
-        </form>
+            <div className="card-body">
+              <div className="field">
+                <label htmlFor="child_name">Name</label>
+                <input
+                  ref={nameInput}
+                  id="child_name"
+                  className="input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  maxLength={128}
+                />
+                <span className="hint">
+                  Its slug, for the path, comes from the name and never changes.
+                  {kind === "project" && ` It starts with ${DEFAULT_ENVIRONMENTS.join(" and ")} environments.`}
+                </span>
+              </div>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={creating || !name.trim()}
+              >
+                {creating ? "Creating…" : `Create ${noun}`}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </>
   )

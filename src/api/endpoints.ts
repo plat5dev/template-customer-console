@@ -1,3 +1,4 @@
+import { config } from "../config"
 import { apiFetch, listAll } from "./client"
 import type {
   AuditEvent,
@@ -37,6 +38,8 @@ function auditPage(path: string, startingAfter?: string) {
 export const api = {
   // The person: user routes.
   getUser: () => apiFetch<User>("/user"),
+  /** The person's name, or null to clear it. 409 when the deployment's IdP owns names. */
+  setName: (name: string | null) => apiFetch<User>("/user", send("PATCH", { name })),
   deleteUser: () => apiFetch<void>("/user", send("DELETE")),
   /** The nodes of a kind the person can see, across every tree; every kind without one. `deleted` lists deleted ones. */
   listMyNodes: (kind?: string, deleted = false) => {
@@ -65,6 +68,15 @@ export const api = {
     listAll<Node>(`${path}/${collection}${deleted ? "?status=deleted" : ""}`, "nodes"),
   createChild: (path: string, collection: string, displayName: string) =>
     apiFetch<Node>(`${path}/${collection}`, send("POST", { display_name: displayName })),
+
+  /**
+   * Whether the caller may make each request, in order: the gateway's route checks,
+   * at the deployment's `route_checks.path`. 1 to 100 a call.
+   */
+  checkRoutes: async (checks: { method: string; path: string }[]) =>
+    (
+      await apiFetch<{ checks: { allowed: boolean }[] }>(config.routeChecksPath, send("POST", { checks }))
+    ).checks.map((c) => c.allowed),
 
   // What the caller holds, and who has access.
   getMembership: (path: string) => apiFetch<Membership>(`${path}/membership`),

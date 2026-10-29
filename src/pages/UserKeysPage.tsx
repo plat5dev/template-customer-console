@@ -4,6 +4,7 @@ import type { CreatedKey, Key } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { KeyRow } from "../components/KeyRow"
 import { Loading, PageHead } from "../components/ui"
+import { useRouteChecks } from "../org/routeChecks"
 
 /** Your personal API keys: each acts as you, in every org you're in. */
 export function UserKeysPage() {
@@ -12,6 +13,16 @@ export function UserKeysPage() {
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const [created, setCreated] = useState<CreatedKey | null>(null)
+
+  // Revoke is asked on the first key that works.
+  const live = keys?.find((k) => !k.revoked_at)
+  const can = useRouteChecks(
+    {
+      create: { method: "POST", path: "/user/keys" },
+      revoke: live && { method: "DELETE", path: `/user/keys/${live.id}` },
+    },
+    keys !== null,
+  )
 
   const load = useCallback(async () => {
     try {
@@ -83,34 +94,36 @@ export function UserKeysPage() {
             <div className="list">
               {keys.length === 0 && <div className="empty">No keys yet.</div>}
               {keys.map((k) => (
-                <KeyRow key={k.id} k={k} onRevoke={() => void onRevoke(k.id)} />
+                <KeyRow key={k.id} k={k} onRevoke={can.revoke ? () => void onRevoke(k.id) : undefined} />
               ))}
             </div>
           )}
         </section>
 
-        <form className="card" onSubmit={(e) => void onCreate(e)}>
-          <div className="card-head">
-            <h2>New key</h2>
-          </div>
-          <div className="card-body">
-            <div className="field">
-              <label htmlFor="key_name">Name</label>
-              <input
-                id="key_name"
-                className="input"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                maxLength={128}
-                placeholder="ci-bot"
-              />
-              <span className="hint">Optional.</span>
+        {can.create && (
+          <form className="card" onSubmit={(e) => void onCreate(e)}>
+            <div className="card-head">
+              <h2>New key</h2>
             </div>
-            <button type="submit" className="btn btn-primary" disabled={creating}>
-              {creating ? "Creating…" : "Create key"}
-            </button>
-          </div>
-        </form>
+            <div className="card-body">
+              <div className="field">
+                <label htmlFor="key_name">Name</label>
+                <input
+                  id="key_name"
+                  className="input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={128}
+                  placeholder="ci-bot"
+                />
+                <span className="hint">Optional.</span>
+              </div>
+              <button type="submit" className="btn btn-primary" disabled={creating}>
+                {creating ? "Creating…" : "Create key"}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </>
   )

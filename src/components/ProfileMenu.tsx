@@ -8,6 +8,9 @@ import { initials } from "./initials"
 import { Menu } from "./Menu"
 import { RedeemDialog } from "./RedeemDialog"
 
+/** An event on `window` when the person changes, like their name: the menu reads `GET /user` again. */
+export const USER_CHANGED = "plat5:user-changed"
+
 /**
  * You, at the sidebar's foot (`GET /user`), and a menu of what's yours: your profile,
  * your personal keys, redeeming an invite, signing out, and deleting your account,
@@ -20,7 +23,10 @@ export function ProfileMenu() {
   const [redeeming, setRedeeming] = useState(false)
 
   useEffect(() => {
-    api.getUser().then(setUser, setError)
+    const load = () => api.getUser().then(setUser, setError)
+    void load()
+    window.addEventListener(USER_CHANGED, load)
+    return () => window.removeEventListener(USER_CHANGED, load)
   }, [])
 
   const name = user?.name ?? "You"

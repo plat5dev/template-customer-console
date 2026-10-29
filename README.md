@@ -38,14 +38,14 @@ src/
   styles/       tokens.css (colors, type, the accent) and ui.css (components)
   api/          endpoints.ts: every call; tree.ts: the kinds, paths and default permissions
   auth/         sign-in (PKCE), the token, the pending invite
-  org/          the node in view (NodeScope), the organizations list, the last scope
+  org/          the node in view (NodeScope), route checks (routeChecks.ts), the organizations list, the last scope
   components/   Layout.tsx (the sidebar), ScopeBar.tsx, ProfileMenu.tsx, and panels the pages share
   learn/        the "How it works" page, and two probes
 ```
 
 The app's paths are the gateway's, by slug: `/user`, `/user/keys`, `/orgs/{organization}/…`, `/orgs/{organization}/projects/{project}/…` and `…/envs/{environment}/…`, with each section a sub-path (`members`, `bindings`, `service-accounts`, `invites`, `audit-events`, `settings`). `src/api/tree.ts` holds the kinds as `plat5.yml` declares them (`organization` at `/orgs`, `project` at `/projects`, `environment` at `/envs`), with how the app shows each: its home page, its names, whether service accounts and invites belong there, and whether the scope bar sets it apart. `src/App.tsx` builds each kind's routes from it, the scope bar its levels, and the sidebar each kind's pages; change it with the kinds.
 
-To add a page: a file in `src/pages/`, a route in `src/App.tsx`, a link in `src/components/Layout.tsx`. A page inside a node reads it with `useNodeView()` (`src/org/nodeView.ts`): its path, and your membership there. `NodeScope` loads it, at each kind's level of the routes.
+To add a page: a file in `src/pages/`, a route in `src/App.tsx`, and a link in `nodePages` in `src/components/Layout.tsx`, with the page's main call. A page inside a node reads it with `useNodeView()` (`src/org/nodeView.ts`): its path, and your membership there. `NodeScope` loads it, at each kind's level of the routes. The page calls `useRouteChecks` with its buttons' requests, or with `{}` when it has none, since its batch carries the sidebar's ([What you can do here](#what-it-shows)).
 
 To drop the teaching material: delete `src/learn/`, its route in `src/App.tsx`, and its link in `src/components/Layout.tsx`.
 
@@ -61,6 +61,7 @@ For production, the Dockerfile's last stage builds the app and serves it with ng
 | `AUTH_REDIRECT_URI` | `VITE_AUTH_REDIRECT_URI` | `{window.location.origin}/callback` |
 | `AUTH_AUDIENCE` | `VITE_AUTH_AUDIENCE` | (unset) |
 | `AUTH_SUBJECT_CLAIM` | `VITE_AUTH_SUBJECT_CLAIM` | `properties.user_id` (the gateway's `AUTH_SUBJECT_CLAIM`) |
+| `ROUTE_CHECKS_PATH` | `VITE_ROUTE_CHECKS_PATH` | `/access/routes` (the deployment's `route_checks.path` in `plat5.yml`) |
 
 ## What it shows
 
@@ -68,7 +69,7 @@ Sign in → Auth password UI (locally, the seeded `dev@example.com` / `password`
 
 **One credential.** Every call sends the person's Auth token as `Authorization: Bearer`. The same token reaches every org they're in; there are no sessions. The browser never sends ids for the caller: the gateway resolves the person from the token and the node from the path.
 
-**The person.** `GET /user` is the account; the name comes from the IdP's name claim, so the app doesn't edit it. `DELETE /user` deletes the account. `/user/keys` are personal keys, sent as `Authorization: Bearer` too. `GET /user/audit-events` is the person's own log. The profile (`/user/profile`, a bio) is your API's.
+**The person.** `GET /user` is the account. Its name is the person's in every org: the Profile page sets it with `PATCH /user { "name" }` and clears it with `{ "name": null }`. Where the deployment's IdP owns names (`users.name.sync: each_sign_in`), that's a `409`: the page says "Your name comes from your sign-in provider." and disables the field for the rest of the session (`sessionStorage`), since the app can't read the deployment's config. `DELETE /user` deletes the account. `/user/keys` are personal keys, sent as `Authorization: Bearer` too. `GET /user/audit-events` is the person's own log. The profile (`/user/profile`, a bio) is your API's.
 
 **Orgs.** The organizations list and the org switcher are `GET /user/nodes?kind=organization`; each node carries its `ancestors`, and the app builds its links from them. `POST /orgs` creates one. Deleted orgs are `GET /user/nodes?kind=organization&status=deleted`, restorable until `purge_after` with `POST /orgs/{organization}/restore`. Projects and environments in orgs the person can't open (a guest's) are `GET /user/nodes`, every kind, showing the highest node on each path.
 
@@ -80,7 +81,9 @@ Sign in → Auth password UI (locally, the seeded `dev@example.com` / `password`
 
 **Landing.** `/` opens the last node you were in and could read, kept in `localStorage` as `plat5.customer-console.last-scope`: the app `GET`s it and opens its overview. If that fails, or the node is deleted, the app forgets it and shows your organizations, as it does with nothing stored.
 
-**What you can do here.** Each node's pages load `GET …/membership`: your member id (to mark "you"), your roles there (badges, and "Guest" for a guest), and your permissions. Buttons for routes your permissions don't reach are hidden or disabled; the gateway still decides. The permission names are identity's and audit's defaults, in `src/api/tree.ts`.
+**What you can do here.** Each page names the requests it makes, by method and public path with the real slugs and ids: each sidebar page its main call (`GET …/bindings` for Access), each button its request (`POST /orgs/{organization}/projects` for Create project, `DELETE …/invites/{invite_id}` for Revoke). A row's buttons are asked on the first row, since the gateway decides by route and node, not by row. On each navigation the page sends all of them, with the sidebar's for the node it's in, in one `POST` to the gateway's route checks path (`/access/routes` by default; `ROUTE_CHECKS_PATH` above), and hides each link and button whose answer is `false`. Until the answer is in, they're hidden, so nothing flashes that you can't use; the sidebar keeps its last answers while you stay on the same node. A button that appears later, like a row's once the first row exists, is asked then. A `401` from the call sends you to sign in again. The declarations sit in each page, beside the buttons (`useRouteChecks` in `src/org/routeChecks.ts`), and in `nodePages` in `src/components/Layout.tsx` for the sidebar. The answers are advisory: the gateway decides each request when it's made, and a stale one is a `403`, shown like any other.
+
+`GET …/membership` on each node says who you are there: your member id (to mark "you") and your roles (badges, and "Guest" for a guest). The scope bar reads it too, for which levels you can read and where "Create …" shows, with identity's default permission names in `src/api/tree.ts`.
 
 **Projects and environments** are `GET`/`POST /orgs/{organization}/projects` and `…/projects/{project}/envs` (the lists walk `has_more`), renamed and deleted on the node, with `?status=deleted` and `POST …/restore`. Creating a project also creates its `Production` and `Development` environments (`DEFAULT_ENVIRONMENTS` in `src/api/tree.ts`), which takes `project:create`: the starters give environments `permission_name: project`, so an environment's routes require `project:*`, and `permissionName` in `KINDS` says so here. An environment's tasks are your API's.
 

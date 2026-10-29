@@ -8,6 +8,7 @@ type Settings = {
   authRedirectUri?: string
   authAudience?: string
   authSubjectClaim?: string
+  routeChecksPath?: string
 }
 
 const runtime: Settings = (window as { __PLAT5_WEB_CONFIG__?: Settings }).__PLAT5_WEB_CONFIG__ ?? {}
@@ -28,4 +29,6 @@ export const config = {
   authAudience: setting("authAudience", "VITE_AUTH_AUDIENCE", "") || undefined,
   /** Same claim path as the gateway's AUTH_SUBJECT_CLAIM. */
   authSubjectClaim: setting("authSubjectClaim", "VITE_AUTH_SUBJECT_CLAIM", "properties.user_id"),
+  /** Where the gateway answers route checks: the deployment's `route_checks.path` in plat5.yml. */
+  routeChecksPath: setting("routeChecksPath", "VITE_ROUTE_CHECKS_PATH", "/access/routes"),
 } as const

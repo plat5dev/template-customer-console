@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import { api } from "../api/endpoints"
-import { isRoot, KINDS, permission } from "../api/tree"
+import { isRoot, KINDS } from "../api/tree"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { NodeHead } from "../components/NodeHead"
 import { useNodeView, useNodeViews } from "../org/nodeView"
 import { useOrgs } from "../org/OrgsContext"
+import { useRouteChecks } from "../org/routeChecks"
 
 /** A node's name, your access to it, leaving (on the org), and deleting it. */
 export function SettingsPage() {
@@ -20,11 +21,15 @@ export function SettingsPage() {
 
   const root = isRoot(view.kind)
   const parent = views[views.length - 2]
-  const canWrite = view.can(permission.write(view.kind))
-  const canDelete = view.can(permission.delete(view.kind))
+  const can = useRouteChecks({
+    rename: { method: "PATCH", path: view.path },
+    remove: { method: "DELETE", path: view.path },
+    leave: root && { method: "DELETE", path: `${view.path}/membership` },
+  })
 
   async function onSave(e: FormEvent) {
     e.preventDefault()
+    if (!can.rename) return
     setSaving(true)
     setSaved(false)
     setError(null)
@@ -88,6 +93,7 @@ export function SettingsPage() {
                   className="input"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  readOnly={!can.rename}
                   required
                   maxLength={128}
                 />
@@ -104,16 +110,13 @@ export function SettingsPage() {
               </dl>
               <span className="hint">The slug is in every path and never changes. The name is only a label.</span>
             </div>
-            <div className="card-foot">
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={saving || !name.trim() || !canWrite}
-                title={canWrite ? undefined : `Needs ${permission.write(view.kind)}`}
-              >
-                {saving ? "Saving…" : "Save"}
-              </button>
-            </div>
+            {can.rename && (
+              <div className="card-foot">
+                <button type="submit" className="btn btn-primary" disabled={saving || !name.trim()}>
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </div>
+            )}
           </form>
         )}
 
@@ -146,7 +149,7 @@ export function SettingsPage() {
               </dd>
             </dl>
           </div>
-          {root && (
+          {can.leave && (
             <div className="card-foot">
               <button type="button" className="btn btn-danger end" onClick={() => void onLeave()}>
                 Leave organization
@@ -155,7 +158,7 @@ export function SettingsPage() {
           )}
         </section>
 
-        {canDelete && (
+        {can.remove && (
           <section className="card danger">
             <div className="card-head">
               <h2>Delete {view.kind}</h2>

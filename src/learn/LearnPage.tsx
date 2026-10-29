@@ -54,8 +54,13 @@ export function LearnPage() {
       <Section title="What you can do here">
         <p>
           <code>GET …/membership</code> on any node answers with your member id, the roles that count there (bound
-          on it, or on a node above it), and the permissions they grant. This app shows the roles,
-          marks you in lists, and hides what you can't use. The gateway decides anyway: a refusal is{" "}
+          on it, or on a node above it), and the permissions they grant. This app shows the roles and marks you in
+          lists.
+        </p>
+        <p>
+          To hide what you can't use, each page names the requests its links and buttons make, by method and path,
+          and asks the gateway about all of them in one <code>POST {config.routeChecksPath}</code>: a route check
+          answers whether the gateway would allow each one for you. The gateway decides anyway: a refusal is{" "}
           <code>403</code>, with <code>required_permissions</code> in its details.
         </p>
         <p>

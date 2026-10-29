@@ -1,12 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react"
 import { api } from "../api/endpoints"
-import { permission } from "../api/tree"
 import type { Task, TaskStatus } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { memberName } from "../components/names"
 import { NodeHead } from "../components/NodeHead"
 import { Loading } from "../components/ui"
 import { useNodeView, useRootView } from "../org/nodeView"
+import { useRouteChecks } from "../org/routeChecks"
 import { useMembers } from "../org/useMembers"
 
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "done"]
@@ -25,8 +25,16 @@ export function TasksPage() {
   const [savingTask, setSavingTask] = useState(false)
 
   const authors = useMembers(org.path, tasks?.map((t) => t.created_by) ?? [])
-  // The starters' tasks routes require what an environment's own routes do.
-  const canWrite = env.can(permission.write("environment"))
+  // Your API's routes. A row's are asked on the first row: the gateway decides by route and node, not by task.
+  const first = tasks?.[0]
+  const can = useRouteChecks(
+    {
+      create: { method: "POST", path: `${env.path}/tasks` },
+      update: first && { method: "PATCH", path: `${env.path}/tasks/${first.id}` },
+      remove: first && { method: "DELETE", path: `${env.path}/tasks/${first.id}` },
+    },
+    tasks !== null,
+  )
 
   useEffect(() => {
     api.listTasks(env.path).then(setTasks, (e: unknown) => {
@@ -121,30 +129,31 @@ export function TasksPage() {
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
 
       <section className="stack-sm">
-        <form className="form-row" onSubmit={(e) => void onCreateTask(e)}>
-          <div className="field">
-            <label htmlFor="task_title" className="small">
-              New task
-            </label>
-            <input
-              id="task_title"
-              className="input"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              maxLength={255}
-              placeholder="What needs doing?"
-            />
-          </div>
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={creating || !title.trim() || !canWrite}
-            title={canWrite ? undefined : `Needs ${permission.write("environment")}`}
-          >
-            {creating ? "Adding…" : "Add task"}
-          </button>
-        </form>
+        {can.create && (
+          <form className="form-row" onSubmit={(e) => void onCreateTask(e)}>
+            <div className="field">
+              <label htmlFor="task_title" className="small">
+                New task
+              </label>
+              <input
+                id="task_title"
+                className="input"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+                maxLength={255}
+                placeholder="What needs doing?"
+              />
+            </div>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={creating || !title.trim()}
+            >
+              {creating ? "Adding…" : "Add task"}
+            </button>
+          </form>
+        )}
         {tasks === null ? (
           <Loading />
         ) : (
@@ -188,8 +197,8 @@ export function TasksPage() {
                         type="button"
                         className="btn-link list-title"
                         style={{ textAlign: "left", color: "var(--text)", cursor: "text" }}
-                        title="Rename"
-                        disabled={!canWrite}
+                        title={can.update ? "Rename" : undefined}
+                        disabled={!can.update}
                         onClick={() => startEditTask(t)}
                       >
                         <span
@@ -207,7 +216,7 @@ export function TasksPage() {
                     className="select select-sm auto"
                     value={t.status}
                     aria-label={`Status of ${t.title}`}
-                    disabled={!canWrite}
+                    disabled={!can.update}
                     onChange={(e) => void onStatus(t, e.target.value as TaskStatus)}
                   >
                     {STATUSES.map((st) => (
@@ -216,7 +225,7 @@ export function TasksPage() {
                       </option>
                     ))}
                   </select>
-                  {canWrite && (
+                  {can.remove && (
                     <button type="button" className="btn btn-sm btn-ghost" onClick={() => void onDeleteTask(t)}>
                       Delete
                     </button>

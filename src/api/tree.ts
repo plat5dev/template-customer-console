@@ -149,21 +149,15 @@ function named(kind: string): string {
 }
 
 /**
- * The permissions identity's and audit's routes require by default (Plat5's
- * resources), by each kind's permission name. A deployment that overrides them
- * changes them here too. They only hide what the gateway would refuse: the gateway
- * decides.
+ * The permissions identity's node routes require by default (Plat5's resources), by
+ * each kind's permission name, for the scope bar: whether a level is readable, from
+ * its membership, and whether "Create …" shows. A deployment that overrides them
+ * changes them here too. Pages and the sidebar ask route checks instead
+ * (`src/org/routeChecks.ts`). Either way, the gateway decides.
  */
 export const permission = {
   read: (kind: string) => `${named(kind)}:read`,
-  write: (kind: string) => `${named(kind)}:write`,
-  delete: (kind: string) => `${named(kind)}:delete`,
   create: (kind: string) => `${named(kind)}:create`,
-  bindingsRead: (kind: string) => `${named(kind)}:bindings:read`,
-  bindingsWrite: (kind: string) => `${named(kind)}:bindings:write`,
-  /** Invites to a root take its bindings:write; invites below one take guests:write. */
-  invites: (kind: string) => (isRoot(kind) ? `${named(kind)}:bindings:write` : "guests:write"),
-  auditRead: () => "audit:read",
 }
 
 /** Whether a membership's permissions hold one. `*` holds every permission. */

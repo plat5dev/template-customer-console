@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { api } from "../api/endpoints"
-import { isRoot, nodePath, permission } from "../api/tree"
+import { isRoot, nodePath } from "../api/tree"
 import type { CreatedInvite, Invite, Node, Role } from "../api/types"
 import { inviteAppUrl } from "../auth/session"
 import { ErrorAlert } from "../components/ErrorAlert"
@@ -8,6 +8,7 @@ import { NodeHead } from "../components/NodeHead"
 import { RoleSelect } from "../components/RoleSelect"
 import { Loading, Status } from "../components/ui"
 import { useNodeView } from "../org/nodeView"
+import { useRouteChecks } from "../org/routeChecks"
 
 const EXPIRES: { label: string; value: string }[] = [
   { label: "1 hour", value: "1h" },
@@ -35,34 +36,48 @@ export function InvitesPage() {
   const [created, setCreated] = useState<CreatedInvite | null>(null)
   const [copied, setCopied] = useState<"link" | "token" | null>(null)
   const [error, setError] = useState<unknown>(null)
+  const [failed, setFailed] = useState(false)
 
-  const needs = permission.invites(view.kind)
-  const canManage = view.can(needs)
+  // Revoke is asked on the first active invite.
+  const active = invites?.find((inv) => inv.status === "active")
+  const can = useRouteChecks(
+    {
+      create: { method: "POST", path: `${view.path}/invites` },
+      revoke: active && { method: "DELETE", path: `${view.path}/invites/${active.id}` },
+      roles: { method: "GET", path: `${view.path}/roles` },
+    },
+    invites !== null,
+  )
+  const creatable = can.create && can.roles
 
   const load = useCallback(async () => {
     try {
       setInvites(await api.listInvites(view.path))
     } catch (e) {
       setError(e)
+      setFailed(true)
       setInvites([])
     }
   }, [view.path])
 
   useEffect(() => {
-    if (!canManage) return
     void load()
+  }, [load])
+
+  useEffect(() => {
+    if (!creatable) return
     api.listRoles(view.path).then((r) => setRoles(r.roles), setError)
-  }, [canManage, load, view.path])
+  }, [creatable, view.path])
 
   // Projects to grant on redeem, with the roles bindable at a project.
   useEffect(() => {
-    if (!canManage || !root) return
+    if (!creatable || !root) return
     void (async () => {
       const list = await api.listChildren(view.path, "projects")
       setProjects(list)
       if (list[0]) setProjectRoles((await api.listRoles(nodePath(list[0]))).roles)
     })().catch(setError)
-  }, [canManage, root, view.path])
+  }, [creatable, root, view.path])
 
   useEffect(() => {
     if (!copied) return
@@ -123,11 +138,7 @@ export function InvitesPage() {
       <NodeHead title="Invites" section="invites" />
       <ErrorAlert error={error} onDismiss={() => setError(null)} />
 
-      {!canManage ? (
-        <div className="alert alert-warn">
-          You can't invite people {root ? "to" : "into"} {view.name} (needs <code>{needs}</code>).
-        </div>
-      ) : (
+      {!failed && (
         <div className="split">
           <section className="stack">
             {created && (
@@ -165,7 +176,7 @@ export function InvitesPage() {
                         {` · expires ${new Date(inv.expires_at).toLocaleString()}`}
                       </div>
                     </div>
-                    {inv.status === "active" && (
+                    {inv.status === "active" && can.revoke && (
                       <button type="button" className="btn btn-sm btn-danger" onClick={() => void onRevoke(inv.id)}>
                         Revoke
                       </button>
@@ -176,63 +187,65 @@ export function InvitesPage() {
             )}
           </section>
 
-          <form className="card" onSubmit={(e) => void onCreate(e)}>
-            <div className="card-head">
-              <h2>New invite link</h2>
-            </div>
-            <div className="card-body">
-              <p className="section-lede">
-                {root
-                  ? `Whoever redeems it joins ${view.name}.`
-                  : `Whoever redeems it gets a role on ${view.name}. Someone outside the org joins as a guest.`}
-              </p>
-              <div className="field">
-                <label htmlFor="invite_role">Role</label>
-                <RoleSelect id="invite_role" roles={roles} value={role} onChange={setRole} />
+          {creatable && (
+            <form className="card" onSubmit={(e) => void onCreate(e)}>
+              <div className="card-head">
+                <h2>New invite link</h2>
               </div>
-              {root && projects.length > 0 && (
+              <div className="card-body">
+                <p className="section-lede">
+                  {root
+                    ? `Whoever redeems it joins ${view.name}.`
+                    : `Whoever redeems it gets a role on ${view.name}. Someone outside the org joins as a guest.`}
+                </p>
                 <div className="field">
-                  <span className="label">And on projects</span>
-                  {projects.map((p) => (
-                    <div key={p.id} className="spread">
-                      <span className="small">{p.display_name}</span>
-                      <select
-                        className="select select-sm auto"
-                        aria-label={`Role on ${p.display_name}`}
-                        value={grants[p.id] ?? ""}
-                        onChange={(e) => setGrants({ ...grants, [p.id]: e.target.value })}
-                      >
-                        <option value="">no role</option>
-                        {projectRoles.map((r) => (
-                          <option key={r.slug} value={r.slug}>
-                            {r.slug}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
+                  <label htmlFor="invite_role">Role</label>
+                  <RoleSelect id="invite_role" roles={roles} value={role} onChange={setRole} />
                 </div>
-              )}
-              <div className="field">
-                <label htmlFor="invite_expires">Expires</label>
-                <select
-                  id="invite_expires"
-                  className="select"
-                  value={expiresIn}
-                  onChange={(e) => setExpiresIn(e.target.value)}
-                >
-                  {EXPIRES.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                {root && projects.length > 0 && (
+                  <div className="field">
+                    <span className="label">And on projects</span>
+                    {projects.map((p) => (
+                      <div key={p.id} className="spread">
+                        <span className="small">{p.display_name}</span>
+                        <select
+                          className="select select-sm auto"
+                          aria-label={`Role on ${p.display_name}`}
+                          value={grants[p.id] ?? ""}
+                          onChange={(e) => setGrants({ ...grants, [p.id]: e.target.value })}
+                        >
+                          <option value="">no role</option>
+                          {projectRoles.map((r) => (
+                            <option key={r.slug} value={r.slug}>
+                              {r.slug}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="field">
+                  <label htmlFor="invite_expires">Expires</label>
+                  <select
+                    id="invite_expires"
+                    className="select"
+                    value={expiresIn}
+                    onChange={(e) => setExpiresIn(e.target.value)}
+                  >
+                    {EXPIRES.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button type="submit" className="btn btn-primary" disabled={creating || !role}>
+                  {creating ? "Creating…" : "Create invite link"}
+                </button>
               </div>
-              <button type="submit" className="btn btn-primary" disabled={creating || !role}>
-                {creating ? "Creating…" : "Create invite link"}
-              </button>
-            </div>
-          </form>
+            </form>
+          )}
         </div>
       )}
     </>

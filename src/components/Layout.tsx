@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom"
 import { Icon, type IconName } from "./icons"
 import { ProfileMenu } from "./ProfileMenu"
@@ -9,6 +9,7 @@ import { useAuth } from "../auth/AuthContext"
 import { config } from "../config"
 import { rememberScope } from "../org/lastScope"
 import { ReportContext, type NodeView } from "../org/nodeView"
+import { NavChecksContext, type NavChecks, type RouteCheck } from "../org/routeChecks"
 import { applyTheme, loadTheme, type Theme } from "../theme"
 
 export function Layout() {
@@ -33,6 +34,26 @@ export function Layout() {
   const here = chain[chain.length - 1]
   const hereView = views[views.length - 1]
 
+  // The sidebar's pages for the node in view, checked in each page's batch. Their answers
+  // stay while the node does, so moving between its pages doesn't blank the sidebar.
+  const [navAllowed, setNavAllowed] = useState<{ path: string; allowed: Record<string, boolean> } | null>(null)
+  const answerNav = useCallback((path: string, allowed: Record<string, boolean>) => {
+    setNavAllowed((prev) => ({ path, allowed: prev?.path === path ? { ...prev.allowed, ...allowed } : allowed }))
+  }, [])
+  const herePath = here?.path
+  const hereKind = here?.kind
+  const navChecks = useMemo<NavChecks | null>(
+    () =>
+      herePath && hereKind
+        ? {
+            path: herePath,
+            checks: Object.fromEntries(nodePages({ kind: hereKind, path: herePath }).map((p) => [p.key, p.check])),
+            answer: answerNav,
+          }
+        : null,
+    [herePath, hereKind, answerNav],
+  )
+
   // The scope `/` opens next: the innermost node in view, once it's loaded and readable.
   useEffect(() => {
     if (hereView?.node) rememberScope(hereView.path)
@@ -55,7 +76,7 @@ export function Layout() {
 
         {authenticated &&
           (here ? (
-            <NodeNav here={here} />
+            <NodeNav here={here} allowed={navAllowed?.path === here.path ? navAllowed.allowed : {}} />
           ) : (
             <nav className="nav-group" aria-label="Organizations">
               <Item to="/orgs" icon="orgs" end>Organizations</Item>
@@ -86,7 +107,9 @@ export function Layout() {
         <div className="content">
           {authenticated && chain.length > 0 && <ScopeBar chain={chain} views={views} />}
           <ReportContext.Provider value={report}>
-            <Outlet />
+            <NavChecksContext.Provider value={navChecks}>
+              <Outlet />
+            </NavChecksContext.Provider>
           </ReportContext.Provider>
         </div>
       </main>
@@ -94,30 +117,59 @@ export function Layout() {
   )
 }
 
+type Page = { key: string; to: string; icon: IconName; label: string; end?: boolean; check: RouteCheck }
+
 /**
- * The pages of the node you're in, the innermost in the path: its children (or your
- * API's tasks, at the bottom), members on a root, access, service accounts where they
- * belong, invites, audit log and settings. The levels above are the scope bar's.
+ * The pages of a node, each with its main call: its children (or your API's tasks, at
+ * the bottom), members on a root, access, service accounts where they belong, invites,
+ * audit log and settings.
  */
-function NodeNav({ here }: { here: Level }) {
+function nodePages({ kind, path: at }: { kind: string; path: string }): Page[] {
+  const k = KINDS[kind]!
+  const get = (path: string): RouteCheck => ({ method: "GET", path })
+  const pages: (Page | false)[] = [
+    k.child
+      ? {
+          key: "children",
+          to: `${at}/${KINDS[k.child]!.collection}`,
+          icon: k.child === "environment" ? "envs" : "projects",
+          label: KINDS[k.child]!.plural,
+          end: true,
+          check: get(`${at}/${KINDS[k.child]!.collection}`),
+        }
+      : { key: "tasks", to: `${at}/tasks`, icon: "projects", label: "Tasks", check: get(`${at}/tasks`) },
+    k.parent === null && { key: "members", to: `${at}/members`, icon: "members", label: "Members", check: get(`${at}/members`) },
+    { key: "bindings", to: `${at}/bindings`, icon: "access", label: "Access", check: get(`${at}/bindings`) },
+    k.serviceAccounts && {
+      key: "service-accounts",
+      to: `${at}/service-accounts`,
+      icon: "bots",
+      label: "Service accounts",
+      check: get(`${at}/service-accounts`),
+    },
+    k.invites && { key: "invites", to: `${at}/invites`, icon: "invites", label: "Invites", check: get(`${at}/invites`) },
+    { key: "audit-events", to: `${at}/audit-events`, icon: "audit", label: "Audit log", check: get(`${at}/audit-events`) },
+    { key: "settings", to: `${at}/settings`, icon: "settings", label: "Settings", check: get(`${at}/membership`) },
+  ]
+  return pages.filter((p) => p !== false)
+}
+
+/**
+ * The pages of the node you're in, the innermost in the path, that its route checks
+ * allow; none until they're answered. The levels above are the scope bar's.
+ */
+function NodeNav({ here, allowed }: { here: Level; allowed: Record<string, boolean> }) {
   const k = KINDS[here.kind]!
-  const at = here.path
   return (
     <nav className="nav-group" aria-label={k.label}>
       <h2>{here.kind}</h2>
-      {k.child ? (
-        <Item to={`${at}/${KINDS[k.child]!.collection}`} icon={k.child === "environment" ? "envs" : "projects"} end>
-          {KINDS[k.child]!.plural}
-        </Item>
-      ) : (
-        <Item to={`${at}/tasks`} icon="projects">Tasks</Item>
-      )}
-      {k.parent === null && <Item to={`${at}/members`} icon="members">Members</Item>}
-      <Item to={`${at}/bindings`} icon="access">Access</Item>
-      {k.serviceAccounts && <Item to={`${at}/service-accounts`} icon="bots">Service accounts</Item>}
-      {k.invites && <Item to={`${at}/invites`} icon="invites">Invites</Item>}
-      <Item to={`${at}/audit-events`} icon="audit">Audit log</Item>
-      <Item to={`${at}/settings`} icon="settings">Settings</Item>
+      {nodePages(here)
+        .filter((p) => allowed[p.key])
+        .map((p) => (
+          <Item key={p.key} to={p.to} icon={p.icon} end={p.end}>
+            {p.label}
+          </Item>
+        ))}
     </nav>
   )
 }
