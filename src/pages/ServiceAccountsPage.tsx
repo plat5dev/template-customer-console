@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react"
-import { Link } from "react-router-dom"
 import { api } from "../api/endpoints"
 import { isRoot } from "../api/tree"
 import type { Role, ServiceAccount } from "../api/types"
@@ -7,7 +6,7 @@ import { ErrorAlert } from "../components/ErrorAlert"
 import { NodeHead } from "../components/NodeHead"
 import { RoleSelect } from "../components/RoleSelect"
 import { ServiceAccountKeys } from "../components/ServiceAccountKeys"
-import { Loading } from "../components/ui"
+import { Loading, TextLink } from "../components/ui"
 import { useNodeView } from "../org/nodeView"
 import { useRouteChecks } from "../org/routeChecks"
 
@@ -36,6 +35,7 @@ export function ServiceAccountsPage() {
       remove: sa && { method: "DELETE", path: sa },
       keys: sa && { method: "GET", path: `${sa}/keys` },
       createKey: sa && { method: "POST", path: `${sa}/keys` },
+      access: { method: "GET", path: `${view.path}/bindings` },
     },
     accounts !== null,
   )
@@ -114,7 +114,11 @@ export function ServiceAccountsPage() {
                 <>Keys for {view.name}.</>
               )}{" "}
               Each belongs to {view.name} and is deleted with it, is a member of the org with roles of its own, and
-              has keys that act as it. Its roles are on <Link to={`${view.path}/bindings`}>Access</Link>, where
+              has keys that act as it. Its roles are on{" "}
+              <TextLink allowed={can.access} to={`${view.path}/bindings`}>
+                Access
+              </TextLink>
+              , where
               accounts from above that can reach it are listed too.
             </p>
             {accounts === null ? (

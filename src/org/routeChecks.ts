@@ -19,13 +19,17 @@ type Maybe = RouteCheck | null | undefined | false | ""
 export type Declared<K extends string> = Record<K, Maybe>
 
 /**
- * The sidebar's pages for the node in view (each page's main call), which each page's
- * batch carries, and where their answers go. The layout provides it.
+ * The layout's links, which each page's batch carries, and where their answers go. The
+ * layout provides it. `node` is the node in view's (the sidebar's pages and the scope
+ * bar's links), carried by the pages of that node; `you` is the profile menu's, carried
+ * by every page.
  */
 export type NavChecks = {
-  path: string
-  checks: Record<string, RouteCheck>
-  answer: (path: string, allowed: Record<string, boolean>) => void
+  /** The node in view's path, or null outside one. */
+  path: string | null
+  node: Record<string, RouteCheck>
+  you: Record<string, RouteCheck>
+  answer: (path: string | null, node: Record<string, boolean>, you: Record<string, boolean>) => void
 }
 
 export const NavChecksContext = createContext<NavChecks | null>(null)
@@ -34,9 +38,11 @@ export const NavChecksContext = createContext<NavChecks | null>(null)
 const MAX_CHECKS = 100
 
 /**
- * Whether the caller may make each of a view's requests: one `POST` to the
- * deployment's route checks path per navigation, with the sidebar's pages for the
- * node in view, sent once `ready` (a page with row actions waits for its rows).
+ * Whether the caller may make each of a view's requests, its buttons' and the requests
+ * its links lead to: one `POST` to the deployment's route checks path per navigation,
+ * with the layout's links (the sidebar's pages and the scope bar's for the node in view,
+ * and the profile menu's), sent once `ready` (a page with row actions waits for its
+ * rows). Nothing is sent signed out.
  * Each answer is `false` until it's in, so nothing forbidden flashes. A request
  * declared later, like a row's action once the first row exists, is asked then.
  * The answers only hide things: the gateway decides each request when it's made.
@@ -45,8 +51,8 @@ const MAX_CHECKS = 100
 export function useRouteChecks<K extends string>(declared: Declared<K>, ready = true): Record<K, boolean> {
   const views = useContext(ScopeContext)
   const nav = useContext(NavChecksContext)
-  const sidebar = nav && nav.path === views[views.length - 1]?.path ? nav : null
-  const { login, logout } = useAuth()
+  const inView = nav?.path != null && nav.path === views[views.length - 1]?.path
+  const { authenticated, login, logout } = useAuth()
   const location = useLocation()
   const here = location.pathname + location.search
   const [allowed, setAllowed] = useState<Record<string, boolean>>({})
@@ -61,13 +67,19 @@ export function useRouteChecks<K extends string>(declared: Declared<K>, ready = 
     .join(" ")
 
   useEffect(() => {
-    if (!ready) return
+    if (!ready || !authenticated) return
     const batch: { name: string; check: RouteCheck }[] = []
     for (const [name, check] of Object.entries(latest.current) as [string, Maybe][]) {
       if (check && !asked.current.has(name)) batch.push({ name, check })
     }
-    for (const [name, check] of Object.entries(sidebar?.checks ?? {})) {
-      if (!asked.current.has(`nav:${name}`)) batch.push({ name: `nav:${name}`, check })
+    const layout: [string, Record<string, RouteCheck>][] = [
+      ["node:", inView ? nav!.node : {}],
+      ["you:", nav?.you ?? {}],
+    ]
+    for (const [prefix, checks] of layout) {
+      for (const [name, check] of Object.entries(checks)) {
+        if (!asked.current.has(prefix + name)) batch.push({ name: prefix + name, check })
+      }
     }
     if (batch.length === 0) return
     for (const b of batch) asked.current.add(b.name)
@@ -80,13 +92,16 @@ export function useRouteChecks<K extends string>(declared: Declared<K>, ready = 
       (parts) => {
         const answers = parts.flat()
         const own: Record<string, boolean> = {}
-        const pages: Record<string, boolean> = {}
+        const node: Record<string, boolean> = {}
+        const you: Record<string, boolean> = {}
         batch.forEach((b, i) => {
-          if (b.name.startsWith("nav:")) pages[b.name.slice(4)] = answers[i] === true
-          else own[b.name] = answers[i] === true
+          const yes = answers[i] === true
+          if (b.name.startsWith("node:")) node[b.name.slice(5)] = yes
+          else if (b.name.startsWith("you:")) you[b.name.slice(4)] = yes
+          else own[b.name] = yes
         })
         setAllowed((prev) => ({ ...prev, ...own }))
-        if (sidebar) sidebar.answer(sidebar.path, pages)
+        if (nav) nav.answer(inView ? nav.path : null, node, you)
       },
       (e: unknown) => {
         // Unanswered stays hidden. A refused credential means signing in again.
@@ -96,7 +111,7 @@ export function useRouteChecks<K extends string>(declared: Declared<K>, ready = 
         }
       },
     )
-  }, [ready, names, sidebar, login, logout, here])
+  }, [ready, authenticated, names, nav, inView, login, logout, here])
 
   const out = {} as Record<K, boolean>
   for (const name of Object.keys(declared) as K[]) out[name] = allowed[name] === true

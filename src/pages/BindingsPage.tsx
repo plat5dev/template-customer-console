@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react"
-import { Link } from "react-router-dom"
 import { api } from "../api/endpoints"
 import { KINDS } from "../api/tree"
 import type { Binding, Member, Role } from "../api/types"
@@ -8,7 +7,7 @@ import { initials } from "../components/initials"
 import { memberName } from "../components/names"
 import { NodeHead } from "../components/NodeHead"
 import { RoleSelect } from "../components/RoleSelect"
-import { Loading } from "../components/ui"
+import { Loading, TextLink } from "../components/ui"
 import { useNodeView, useNodeViews, useRootView } from "../org/nodeView"
 import { useRouteChecks } from "../org/routeChecks"
 
@@ -32,15 +31,26 @@ export function BindingsPage() {
   const [failed, setFailed] = useState(false)
 
   const givesRoles = KINDS[view.kind]!.bindings
+  // New people are invited here, or where invites aren't, at the org.
+  const invitesAt = KINDS[view.kind]!.invites ? view : root
   // A row's requests are asked on the first binding given here.
   const own = bindings?.find((b) => !b.inherited)
-  const can = useRouteChecks(
+  const can = useRouteChecks<
+    "add" | "change" | "remove" | "roles" | "members" | "serviceAccounts" | "invites" | `above:${number}`
+  >(
     {
       add: givesRoles && { method: "POST", path: `${view.path}/bindings` },
       change: own && { method: "PATCH", path: `${view.path}/bindings/${own.id}` },
       remove: own && { method: "DELETE", path: `${view.path}/bindings/${own.id}` },
       roles: { method: "GET", path: `${view.path}/roles` },
       members: givesRoles && { method: "GET", path: `${root.path}/members` },
+      // Where its links lead: each node above's Access, where an inherited role sits, and
+      // service accounts or invites, from the note under the lists.
+      ...Object.fromEntries(
+        views.slice(0, -1).map((v, i) => [`above:${i}`, { method: "GET", path: `${v.path}/bindings` } as const]),
+      ),
+      serviceAccounts: !givesRoles && { method: "GET", path: `${view.path}/service-accounts` },
+      invites: givesRoles && { method: "GET", path: `${invitesAt.path}/invites` },
     },
     bindings !== null,
   )
@@ -74,9 +84,13 @@ export function BindingsPage() {
 
   /** Where an inherited binding sits: one of the nodes above, in view. */
   function from(b: Binding) {
-    const at = views.find((v) => v.node?.id === b.node_id)
-    if (!at) return <span className="muted">an ancestor</span>
-    return <Link to={`${at.path}/bindings`}>{at.name}</Link>
+    const i = views.findIndex((v) => v.node?.id === b.node_id)
+    if (i < 0) return <span className="muted">an ancestor</span>
+    return (
+      <TextLink allowed={can[`above:${i}`]} to={`${views[i]!.path}/bindings`}>
+        {views[i]!.name}
+      </TextLink>
+    )
   }
 
   async function onAdd(e: FormEvent) {
@@ -243,17 +257,17 @@ export function BindingsPage() {
                 {!givesRoles ? (
                   <>
                     People reach {view.name} through roles above it. A{" "}
-                    <Link to={`${view.path}/service-accounts`}>service account</Link> gets its role here when it's
-                    created.
+                    <TextLink allowed={can.serviceAccounts} to={`${view.path}/service-accounts`}>
+                      service account
+                    </TextLink>{" "}
+                    gets its role here when it's created.
                   </>
                 ) : (
                   <>
                     New people join by{" "}
-                    {KINDS[view.kind]!.invites ? (
-                      <Link to={`${view.path}/invites`}>invite</Link>
-                    ) : (
-                      <Link to={`${root.path}/invites`}>invite to {root.name}</Link>
-                    )}
+                    <TextLink allowed={can.invites} to={`${invitesAt.path}/invites`}>
+                      {invitesAt === view ? "invite" : `invite to ${root.name}`}
+                    </TextLink>
                     .
                   </>
                 )}

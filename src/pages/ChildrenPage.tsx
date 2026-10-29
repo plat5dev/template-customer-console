@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
-import { Link, useLocation, useNavigate } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { api } from "../api/endpoints"
 import { DEFAULT_ENVIRONMENTS, KINDS, nodeHome, nodePath } from "../api/tree"
 import type { Node } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { NodeHead } from "../components/NodeHead"
-import { Loading, Status } from "../components/ui"
+import { ListTitle, Loading, Status } from "../components/ui"
 import { useNodeView } from "../org/nodeView"
 import { useRouteChecks } from "../org/routeChecks"
 
@@ -29,10 +29,14 @@ export function ChildrenPage({ kind }: { kind: string }) {
   const [error, setError] = useState<unknown>(null)
 
   // Its requests, checked once the list is in. Restore is asked once deleted ones show.
-  const can = useRouteChecks(
+  // Each listed one's link is asked on its overview's main call.
+  const can = useRouteChecks<"create" | "restore" | `open:${string}`>(
     {
       create: { method: "POST", path: `${parent.path}/${collection}` },
       restore: deleted?.[0] && { method: "POST", path: `${nodePath(deleted[0])}/restore` },
+      ...Object.fromEntries(
+        (children ?? []).map((c) => [`open:${c.id}`, { method: "GET", path: nodeHome(c) } as const]),
+      ),
     },
     children !== null,
   )
@@ -128,9 +132,9 @@ export function ChildrenPage({ kind }: { kind: string }) {
               {children.map((c) => (
                 <div key={c.id} className="list-item">
                   <div>
-                    <Link className="list-title" to={nodeHome(c)}>
+                    <ListTitle allowed={can[`open:${c.id}`]} to={nodeHome(c)}>
                       {c.display_name}
-                    </Link>
+                    </ListTitle>
                     <div className="list-meta mono">{c.slug}</div>
                   </div>
                 </div>

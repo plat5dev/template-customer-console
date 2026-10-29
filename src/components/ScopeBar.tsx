@@ -4,6 +4,7 @@ import { api } from "../api/endpoints"
 import { isRoot, KINDS, nodePath, permission, type Level } from "../api/tree"
 import type { Node } from "../api/types"
 import type { NodeView } from "../org/nodeView"
+import { listPath } from "../org/layoutChecks"
 import { ErrorAlert } from "./ErrorAlert"
 import { Menu } from "./Menu"
 
@@ -12,13 +13,23 @@ const SEARCH_OVER = 8
 
 /**
  * Where you are, a segment per level of the path: `Acme ▾ / Web ▾ / live ▾`. A level
- * is readable when its own membership grants the kind's read permission: its name
- * links to its overview, and ▾ switches to a sibling. A level you can't read, like a
- * guest's org, is its name alone, and nothing under it that would refuse is called.
- * Names come from the innermost node loaded: its own, and its `ancestors` above it.
- * At phone width only the current level shows, after a "…" menu of the levels above.
+ * is readable when its own membership grants the kind's read permission: ▾ switches to
+ * a sibling, and its name links to its overview where the overview's route check
+ * allows it. A level you can't read, like a guest's org, is its name alone, and nothing
+ * under it that would refuse is called. `allowed` holds the answers for
+ * `scopeChecks(chain)` (`src/org/layoutChecks.ts`); a link shows once its answer is `true`. Names come from the
+ * innermost node loaded: its own, and its `ancestors` above it. At phone width only the
+ * current level shows, after a "…" menu of the levels above.
  */
-export function ScopeBar({ chain, views }: { chain: Level[]; views: (NodeView | null)[] }) {
+export function ScopeBar({
+  chain,
+  views,
+  allowed,
+}: {
+  chain: Level[]
+  views: (NodeView | null)[]
+  allowed: Record<string, boolean>
+}) {
   const loaded = views.filter((v) => v !== null)
   const here = loaded[loaded.length - 1]
   const named = here?.node ? [...here.node.ancestors, here.node] : []
@@ -26,6 +37,7 @@ export function ScopeBar({ chain, views }: { chain: Level[]; views: (NodeView | 
     ...level,
     name: named[i]?.display_name ?? views[i]?.name ?? level.slug,
     readable: views[i]?.can(permission.read(level.kind)) ?? false,
+    linked: (views[i]?.can(permission.read(level.kind)) ?? false) && allowed[`overview:${i}`] === true,
     overview: `${level.path}/${KINDS[level.kind]!.home}`,
   }))
   const current = levels.length - 1
@@ -44,7 +56,7 @@ export function ScopeBar({ chain, views }: { chain: Level[]; views: (NodeView | 
         >
           {(close) =>
             above.map((l) =>
-              l.readable ? (
+              l.linked ? (
                 <Link key={l.path} role="menuitem" className="menu-item" to={l.overview} onClick={close}>
                   {l.name}
                   <small>{KINDS[l.kind]!.label}</small>
@@ -70,7 +82,7 @@ export function ScopeBar({ chain, views }: { chain: Level[]; views: (NodeView | 
             className={`scope-seg${KINDS[l.kind]!.marked ? " marked" : ""}${i === current ? " current" : ""}`}
             data-kind={l.kind}
           >
-            {l.readable ? (
+            {l.linked ? (
               <Link className="scope-label" to={l.overview}>
                 {l.name}
               </Link>
@@ -81,8 +93,8 @@ export function ScopeBar({ chain, views }: { chain: Level[]; views: (NodeView | 
               <LevelSwitcher
                 chain={chain}
                 at={i}
-                parent={views[i - 1] ?? null}
                 parentReadable={levels[i - 1]?.readable ?? false}
+                allowed={allowed}
               />
             )}
           </span>
@@ -96,24 +108,26 @@ export function ScopeBar({ chain, views }: { chain: Level[]; views: (NodeView | 
  * A level's siblings you can see, read when the menu opens: the root kind's from
  * `GET /user/nodes?kind=…`, any other's from the parent's list. Picking one keeps your
  * place: the levels below and the page, where they exist there. "View all" is the
- * parent's list, or your organizations when you can't read the parent, as a guest.
+ * parent's list, or your organizations when you can't read the parent, as a guest;
+ * it and "Create …" show where their route checks allow them.
  */
 function LevelSwitcher({
   chain,
   at,
-  parent,
   parentReadable,
+  allowed,
 }: {
   chain: Level[]
   at: number
-  parent: NodeView | null
   parentReadable: boolean
+  allowed: Record<string, boolean>
 }) {
   const level = chain[at]!
   const k = KINDS[level.kind]!
   const root = isRoot(level.kind)
-  const listPath = root ? `/${k.collection}` : `${chain[at - 1]!.path}/${k.collection}`
-  const all = root || parentReadable ? listPath : `/${KINDS[chain[0]!.kind]!.collection}`
+  const list = listPath(chain, at)
+  const allAt = root || parentReadable ? at : 0
+  const all = listPath(chain, allAt)
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [siblings, setSiblings] = useState<Node[] | null>(null)
@@ -124,8 +138,8 @@ function LevelSwitcher({
     setSiblings(null)
     setQuery("")
     setError(null)
-    const list = root ? api.listMyNodes(level.kind) : api.listChildren(chain[at - 1]!.path, k.collection)
-    list.then(setSiblings, setError)
+    const read = root ? api.listMyNodes(level.kind) : api.listChildren(chain[at - 1]!.path, k.collection)
+    read.then(setSiblings, setError)
   }
 
   /**
@@ -158,7 +172,6 @@ function LevelSwitcher({
   const q = query.trim().toLowerCase()
   const shown =
     siblings && q ? siblings.filter((s) => s.display_name.toLowerCase().includes(q) || s.slug.includes(q)) : siblings
-  const canCreate = root || parent!.can(permission.create(level.kind))
   const nouns = k.plural.toLowerCase()
 
   return (
@@ -202,15 +215,17 @@ function LevelSwitcher({
               {s.display_name}
             </button>
           ))}
-          <hr />
-          {canCreate && (
-            <Link role="menuitem" className="menu-item" to={`${listPath}#create`} onClick={close}>
+          {(allowed[`create:${at}`] || allowed[`list:${allAt}`]) && <hr />}
+          {allowed[`create:${at}`] && (
+            <Link role="menuitem" className="menu-item" to={`${list}#create`} onClick={close}>
               Create {k.label.toLowerCase()}
             </Link>
           )}
-          <Link role="menuitem" className="menu-item" to={all} onClick={close}>
-            View all
-          </Link>
+          {allowed[`list:${allAt}`] && (
+            <Link role="menuitem" className="menu-item" to={all} onClick={close}>
+              View all
+            </Link>
+          )}
         </>
       )}
     </Menu>

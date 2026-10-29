@@ -6,6 +6,7 @@ import type { Membership, Node } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { Loading } from "../components/ui"
 import { ReportContext, ScopeContext, type NodeView } from "./nodeView"
+import { useRouteChecks } from "./routeChecks"
 
 /**
  * A route level for one kind: reads the node's slug from the path, loads the
@@ -58,19 +59,23 @@ function Loaded({ kind, slug, path, parents }: { kind: string; slug: string; pat
     return () => report(depth, null)
   }, [report, depth, view])
 
-  if (error) {
-    return (
-      <div className="stack narrow">
-        <ErrorAlert error={error} />
-        <Link to="/orgs">Organizations</Link>
-      </div>
-    )
-  }
+  if (error) return <Unreachable error={error} />
   if (!view) return <Loading />
 
   return (
     <ScopeContext.Provider value={[...parents, view]}>
       <Outlet />
     </ScopeContext.Provider>
+  )
+}
+
+/** A node that didn't load: the error, and a way to your organizations where it's allowed. */
+function Unreachable({ error }: { error: unknown }) {
+  const can = useRouteChecks({ orgs: { method: "GET", path: "/user/nodes" } })
+  return (
+    <div className="stack narrow">
+      <ErrorAlert error={error} />
+      {can.orgs && <Link to="/orgs">Organizations</Link>}
+    </div>
   )
 }

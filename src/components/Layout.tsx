@@ -8,6 +8,7 @@ import { chainFromPath, KINDS, type Level } from "../api/tree"
 import { useAuth } from "../auth/AuthContext"
 import { config } from "../config"
 import { rememberScope } from "../org/lastScope"
+import { profileChecks, scopeChecks } from "../org/layoutChecks"
 import { ReportContext, type NodeView } from "../org/nodeView"
 import { NavChecksContext, type NavChecks, type RouteCheck } from "../org/routeChecks"
 import { applyTheme, loadTheme, type Theme } from "../theme"
@@ -34,25 +35,38 @@ export function Layout() {
   const here = chain[chain.length - 1]
   const hereView = views[views.length - 1]
 
-  // The sidebar's pages for the node in view, checked in each page's batch. Their answers
-  // stay while the node does, so moving between its pages doesn't blank the sidebar.
+  // The layout's links, checked in each page's batch: the sidebar's pages and the scope
+  // bar's for the node in view, whose answers stay while the node does, so moving between
+  // its pages doesn't blank them; and the profile menu's, kept across every page.
   const [navAllowed, setNavAllowed] = useState<{ path: string; allowed: Record<string, boolean> } | null>(null)
-  const answerNav = useCallback((path: string, allowed: Record<string, boolean>) => {
-    setNavAllowed((prev) => ({ path, allowed: prev?.path === path ? { ...prev.allowed, ...allowed } : allowed }))
-  }, [])
-  const herePath = here?.path
-  const hereKind = here?.kind
-  const navChecks = useMemo<NavChecks | null>(
-    () =>
-      herePath && hereKind
-        ? {
-            path: herePath,
-            checks: Object.fromEntries(nodePages({ kind: hereKind, path: herePath }).map((p) => [p.key, p.check])),
-            answer: answerNav,
-          }
-        : null,
-    [herePath, hereKind, answerNav],
+  const [youAllowed, setYouAllowed] = useState<Record<string, boolean>>({})
+  const answerNav = useCallback(
+    (path: string | null, node: Record<string, boolean>, you: Record<string, boolean>) => {
+      if (path !== null && Object.keys(node).length > 0) {
+        setNavAllowed((prev) => ({ path, allowed: prev?.path === path ? { ...prev.allowed, ...node } : node }))
+      }
+      if (Object.keys(you).length > 0) setYouAllowed((prev) => ({ ...prev, ...you }))
+    },
+    [],
   )
+  const herePath = here?.path ?? null
+  const navChecks = useMemo<NavChecks>(() => {
+    const levels = chainFromPath(herePath ?? "")
+    const at = levels[levels.length - 1]
+    const node: Record<string, RouteCheck> = {}
+    if (at) {
+      for (const p of nodePages(at)) node[`page:${p.key}`] = p.check
+      for (const [k, c] of Object.entries(scopeChecks(levels))) node[`scope:${k}`] = c
+    }
+    return { path: herePath, node, you: profileChecks, answer: answerNav }
+  }, [herePath, answerNav])
+  const nodeAllowed = here && navAllowed?.path === here.path ? navAllowed.allowed : {}
+  const prefixed = (prefix: string) =>
+    Object.fromEntries(
+      Object.entries(nodeAllowed)
+        .filter(([k]) => k.startsWith(prefix))
+        .map(([k, v]) => [k.slice(prefix.length), v]),
+    )
 
   // The scope `/` opens next: the innermost node in view, once it's loaded and readable.
   useEffect(() => {
@@ -76,7 +90,7 @@ export function Layout() {
 
         {authenticated &&
           (here ? (
-            <NodeNav here={here} allowed={navAllowed?.path === here.path ? navAllowed.allowed : {}} />
+            <NodeNav here={here} allowed={prefixed("page:")} />
           ) : (
             <nav className="nav-group" aria-label="Organizations">
               <Item to="/orgs" icon="orgs" end>Organizations</Item>
@@ -94,7 +108,7 @@ export function Layout() {
           </div>
           {ready &&
             (authenticated ? (
-              <ProfileMenu />
+              <ProfileMenu allowed={youAllowed} />
             ) : (
               <button type="button" className="btn btn-primary btn-sm" onClick={() => void login("/")}>
                 Sign in
@@ -105,7 +119,7 @@ export function Layout() {
 
       <main className="main">
         <div className="content">
-          {authenticated && chain.length > 0 && <ScopeBar chain={chain} views={views} />}
+          {authenticated && chain.length > 0 && <ScopeBar chain={chain} views={views} allowed={prefixed("scope:")} />}
           <ReportContext.Provider value={report}>
             <NavChecksContext.Provider value={navChecks}>
               <Outlet />

@@ -149,15 +149,15 @@ function named(kind: string): string {
 }
 
 /**
- * The permissions identity's node routes require by default (Plat5's resources), by
- * each kind's permission name, for the scope bar: whether a level is readable, from
- * its membership, and whether "Create …" shows. A deployment that overrides them
- * changes them here too. Pages and the sidebar ask route checks instead
- * (`src/org/routeChecks.ts`). Either way, the gateway decides.
+ * The permission identity's node routes require by default to read a node (Plat5's
+ * resources), by each kind's permission name: whether `NodeScope` reads the node, and
+ * whether the scope bar's level is readable, from its membership. A deployment that
+ * overrides it changes it here too. Pages, the sidebar, the scope bar's links and the
+ * profile menu ask route checks instead (`src/org/routeChecks.ts`). Either way, the
+ * gateway decides.
  */
 export const permission = {
   read: (kind: string) => `${named(kind)}:read`,
-  create: (kind: string) => `${named(kind)}:create`,
 }
 
 /** Whether a membership's permissions hold one. `*` holds every permission. */

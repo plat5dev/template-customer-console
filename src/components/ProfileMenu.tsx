@@ -14,9 +14,10 @@ export const USER_CHANGED = "plat5:user-changed"
 /**
  * You, at the sidebar's foot (`GET /user`), and a menu of what's yours: your profile,
  * your personal keys, redeeming an invite, signing out, and deleting your account,
- * which opens the confirmation on the profile page.
+ * which opens the confirmation on the profile page. `allowed` holds the answers for
+ * `profileChecks` (`src/org/layoutChecks.ts`): an item shows once its answer is `true`; Sign out always shows.
  */
-export function ProfileMenu() {
+export function ProfileMenu({ allowed }: { allowed: Record<string, boolean> }) {
   const { logout } = useAuth()
   const [user, setUser] = useState<User | null>(null)
   const [error, setError] = useState<unknown>(null)
@@ -49,30 +50,38 @@ export function ProfileMenu() {
       >
         {(close) => (
           <>
-            <Link role="menuitem" className="menu-item" to="/user" onClick={close}>
-              Profile
-            </Link>
-            <Link role="menuitem" className="menu-item" to="/user/keys" onClick={close}>
-              Personal keys
-            </Link>
-            <button
-              type="button"
-              role="menuitem"
-              className="menu-item"
-              onClick={() => {
-                close()
-                setRedeeming(true)
-              }}
-            >
-              Redeem an invite
-            </button>
-            <hr />
+            {allowed.profile && (
+              <Link role="menuitem" className="menu-item" to="/user" onClick={close}>
+                Profile
+              </Link>
+            )}
+            {allowed.keys && (
+              <Link role="menuitem" className="menu-item" to="/user/keys" onClick={close}>
+                Personal keys
+              </Link>
+            )}
+            {allowed.redeem && (
+              <button
+                type="button"
+                role="menuitem"
+                className="menu-item"
+                onClick={() => {
+                  close()
+                  setRedeeming(true)
+                }}
+              >
+                Redeem an invite
+              </button>
+            )}
+            {(allowed.profile || allowed.keys || allowed.redeem) && <hr />}
             <button type="button" role="menuitem" className="menu-item" onClick={logout}>
               Sign out
             </button>
-            <Link role="menuitem" className="menu-item danger" to="/user#delete-account" onClick={close}>
-              Delete account
-            </Link>
+            {allowed.delete && allowed.profile && (
+              <Link role="menuitem" className="menu-item danger" to="/user#delete-account" onClick={close}>
+                Delete account
+              </Link>
+            )}
           </>
         )}
       </Menu>

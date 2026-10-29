@@ -8,7 +8,7 @@ import { initials } from "../components/initials"
 import { memberName } from "../components/names"
 import { NodeHead } from "../components/NodeHead"
 import { RoleSelect } from "../components/RoleSelect"
-import { Loading } from "../components/ui"
+import { Loading, TextLink } from "../components/ui"
 import { useNodeView } from "../org/nodeView"
 import { useRouteChecks } from "../org/routeChecks"
 
@@ -31,6 +31,11 @@ export function MembersPage() {
       add: { method: "POST", path: `${org.path}/members` },
       remove: other && { method: "DELETE", path: `${org.path}/members/${other.id}` },
       roles: { method: "GET", path: `${org.path}/roles` },
+      // Where its links lead: leaving (on Settings), service accounts, access and invites.
+      leave: { method: "DELETE", path: `${org.path}/membership` },
+      serviceAccounts: { method: "GET", path: `${org.path}/service-accounts` },
+      access: { method: "GET", path: `${org.path}/bindings` },
+      invites: { method: "GET", path: `${org.path}/invites` },
     },
     members !== null,
   )
@@ -129,13 +134,17 @@ export function MembersPage() {
                           </td>
                           <td className="actions">
                             {me ? (
-                              <Link className="btn btn-sm btn-ghost" to={`${org.path}/settings`}>
-                                Leave
-                              </Link>
+                              can.leave && (
+                                <Link className="btn btn-sm btn-ghost" to={`${org.path}/settings`}>
+                                  Leave
+                                </Link>
+                              )
                             ) : bot ? (
-                              <Link className="btn btn-sm btn-ghost" to={`${org.path}/service-accounts`}>
-                                Service accounts
-                              </Link>
+                              can.serviceAccounts && (
+                                <Link className="btn btn-sm btn-ghost" to={`${org.path}/service-accounts`}>
+                                  Service accounts
+                                </Link>
+                              )
                             ) : (
                               can.remove && (
                                 <button
@@ -157,8 +166,15 @@ export function MembersPage() {
               </div>
             )}
             <p className="small muted">
-              Roles are on <Link to={`${org.path}/bindings`}>Access</Link>. A guest has roles only below the org, on projects or environments. To
-              invite people by link, use <Link to={`${org.path}/invites`}>Invites</Link>.
+              Roles are on{" "}
+              <TextLink allowed={can.access} to={`${org.path}/bindings`}>
+                Access
+              </TextLink>
+              . A guest has roles only below the org, on projects or environments. To invite people by link, use{" "}
+              <TextLink allowed={can.invites} to={`${org.path}/invites`}>
+                Invites
+              </TextLink>
+              .
             </p>
           </section>
 

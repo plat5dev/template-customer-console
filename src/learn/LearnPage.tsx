@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { PageHead } from "../components/ui"
 import { config } from "../config"
+import { useRouteChecks } from "../org/routeChecks"
 import { KeyProbe } from "./KeyProbe"
 import { OrgProbe } from "./OrgProbe"
 
@@ -20,6 +21,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function LearnPage() {
+  // No links or buttons of its own, but its batch carries the profile menu's.
+  useRouteChecks({})
   return (
     <div className="stack" style={{ maxWidth: "52rem" }}>
       <PageHead

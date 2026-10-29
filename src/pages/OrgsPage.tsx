@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
-import { Link, useLocation, useNavigate } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { api } from "../api/endpoints"
 import { nodeHome, nodePath } from "../api/tree"
 import type { Node } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { initials } from "../components/initials"
-import { Loading, PageHead, Status } from "../components/ui"
+import { ListTitle, Loading, PageHead, Status } from "../components/ui"
 import { useOrgs } from "../org/OrgsContext"
 import { useRouteChecks } from "../org/routeChecks"
 
@@ -25,14 +25,19 @@ export function OrgsPage() {
   const [guestNodes, setGuestNodes] = useState<Node[]>([])
   const [error, setError] = useState<unknown>(null)
   const [deletedLoaded, setDeletedLoaded] = useState(false)
+  const [guestLoaded, setGuestLoaded] = useState(false)
 
-  // Restore is asked on the first deleted org.
-  const can = useRouteChecks(
+  // Restore is asked on the first deleted org; each listed node's link, on its overview's
+  // main call. Sent once the lists are in.
+  const can = useRouteChecks<"create" | "restore" | `open:${string}`>(
     {
       create: { method: "POST", path: "/orgs" },
       restore: deleted[0] && { method: "POST", path: `${nodePath(deleted[0])}/restore` },
+      ...Object.fromEntries(
+        [...orgs, ...guestNodes].map((n) => [`open:${n.id}`, { method: "GET", path: nodeHome(n) } as const]),
+      ),
     },
-    deletedLoaded,
+    deletedLoaded && guestLoaded,
   )
 
   const loadDeleted = useCallback(async () => {
@@ -56,7 +61,7 @@ export function OrgsPage() {
       const outside = list.filter((n) => !orgs.some((o) => o.id === n.root_id))
       const ids = new Set(outside.map((n) => n.id))
       setGuestNodes(outside.filter((n) => !n.ancestors.some((a) => ids.has(a.id))))
-    }, setError)
+    }, setError).finally(() => setGuestLoaded(true))
   }, [orgs, loading])
 
   async function onCreate(e: FormEvent) {
@@ -107,9 +112,9 @@ export function OrgsPage() {
                   <div className="who">
                     <span className="avatar square">{initials(o.display_name)}</span>
                     <span>
-                      <Link className="list-title" to={nodeHome(o)}>
+                      <ListTitle allowed={can[`open:${o.id}`]} to={nodeHome(o)}>
                         {o.display_name}
-                      </Link>
+                      </ListTitle>
                       <span className="sub mono">{nodePath(o)}</span>
                     </span>
                   </div>
@@ -128,9 +133,9 @@ export function OrgsPage() {
                 {guestNodes.map((n) => (
                   <div key={n.id} className="list-item">
                     <div>
-                      <Link className="list-title" to={nodeHome(n)}>
+                      <ListTitle allowed={can[`open:${n.id}`]} to={nodeHome(n)}>
                         {n.display_name}
-                      </Link>
+                      </ListTitle>
                       <div className="list-meta">
                         {n.kind} in {n.ancestors.map((a) => a.display_name).join(" / ")}
                       </div>
