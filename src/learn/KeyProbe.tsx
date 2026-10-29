@@ -66,7 +66,7 @@ export function KeyProbe() {
     if (!k) return
     void run(async () => {
       const parts = [
-        "A personal key passes on both: it acts as you. A service account key is 401 on the user route, and works only in its own org.",
+        "A personal key passes on both: it acts as you. A service account key is 403 on the user route (\"Service accounts can't use this route.\"), and works only in its own org. A 401 means the key itself is bad: unknown or revoked.",
         "",
       ]
       for (const p of ["/user", `${org}/membership`]) {
