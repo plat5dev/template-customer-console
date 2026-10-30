@@ -7,13 +7,12 @@ export type NodeView = {
   slug: string
   /** The gateway path, which is also this app's: `/orgs/acme/projects/web/envs/production`. */
   path: string
-  /** Null when the caller can't read the node itself, like a guest at the org. */
+  /** Null when the node's route check doesn't allow reading it, like a guest's org. */
   node: Node | null
   /** Who the caller is here: their member id, roles and permissions. */
   membership: Membership
+  /** The node's name; when it can't be read, from the ancestors of a node you can; else its slug. */
   name: string
-  /** Whether the membership holds a permission: the scope bar's readable levels and "Create …". */
-  can: (permission: string) => boolean
   reload: () => Promise<void>
 }
 
@@ -25,6 +24,14 @@ export const ScopeContext = createContext<NodeView[]>([])
  * it unmounts: the scope bar and the last scope sit outside the routes, in the layout.
  */
 export const ReportContext = createContext<(depth: number, view: NodeView | null) => void>(() => {})
+
+/**
+ * The answers to the scope bar's checks for the node in view (`scopeChecks` in
+ * `layoutChecks.ts`), by name: `read:{i}`, `list:{i}` and the rest. The layout provides
+ * them; a level reads its own `read:{depth}` before it loads its node. A name is missing
+ * until its answer is in.
+ */
+export const ScopeAnswersContext = createContext<Record<string, boolean>>({})
 
 /** Every node in view, root first: the org, then the project, then the environment. */
 export function useNodeViews(): NodeView[] {

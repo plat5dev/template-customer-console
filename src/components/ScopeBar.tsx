@@ -1,7 +1,7 @@
 import { Fragment, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { api } from "../api/endpoints"
-import { isRoot, KINDS, nodePath, permission, type Level } from "../api/tree"
+import { isRoot, KINDS, nodePath, type Level } from "../api/tree"
 import type { Node } from "../api/types"
 import type { NodeView } from "../org/nodeView"
 import { listPath } from "../org/layoutChecks"
@@ -12,14 +12,14 @@ import { Menu } from "./Menu"
 const SEARCH_OVER = 8
 
 /**
- * Where you are, a segment per level of the path: `Acme ▾ / Web ▾ / live ▾`. A level
- * is readable when its own membership grants the kind's read permission: ▾ switches to
- * a sibling, and its name links to its overview where the overview's route check
- * allows it. A level you can't read, like a guest's org, is its name alone, and nothing
- * under it that would refuse is called. `allowed` holds the answers for
- * `scopeChecks(chain)` (`src/org/layoutChecks.ts`); a link shows once its answer is `true`. Names come from the
- * innermost node loaded: its own, and its `ancestors` above it. At phone width only the
- * current level shows, after a "…" menu of the levels above.
+ * Where you are, a segment per level of the path: `Acme ▾ / Web ▾ / live ▾`. Route
+ * checks alone decide each part: a level's name links to its overview where the
+ * overview's main call is allowed, and ▾ switches to a sibling where the list it reads
+ * is. A guest's org links to its overview, the projects they can see. `allowed` holds
+ * the answers for `scopeChecks(chain)` (`src/org/layoutChecks.ts`); each shows once its
+ * answer is `true`. Names come from the innermost node loaded: its own, and its
+ * `ancestors` above it. At phone width only the current level shows, after a "…" menu
+ * of the levels above.
  */
 export function ScopeBar({
   chain,
@@ -36,8 +36,8 @@ export function ScopeBar({
   const levels = chain.map((level, i) => ({
     ...level,
     name: named[i]?.display_name ?? views[i]?.name ?? level.slug,
-    readable: views[i]?.can(permission.read(level.kind)) ?? false,
-    linked: (views[i]?.can(permission.read(level.kind)) ?? false) && allowed[`overview:${i}`] === true,
+    linked: allowed[`overview:${i}`] === true,
+    switchable: allowed[`list:${i}`] === true,
     overview: `${level.path}/${KINDS[level.kind]!.home}`,
   }))
   const current = levels.length - 1
@@ -89,14 +89,7 @@ export function ScopeBar({
             ) : (
               <span className="scope-label">{l.name}</span>
             )}
-            {l.readable && (
-              <LevelSwitcher
-                chain={chain}
-                at={i}
-                parentReadable={levels[i - 1]?.readable ?? false}
-                allowed={allowed}
-              />
-            )}
+            {l.switchable && <LevelSwitcher chain={chain} at={i} allowed={allowed} />}
           </span>
         </Fragment>
       ))}
@@ -107,27 +100,14 @@ export function ScopeBar({
 /**
  * A level's siblings you can see, read when the menu opens: the root kind's from
  * `GET /user/nodes?kind=…`, any other's from the parent's list. Picking one keeps your
- * place: the levels below and the page, where they exist there. "View all" is the
- * parent's list, or your organizations when you can't read the parent, as a guest;
- * it and "Create …" show where their route checks allow them.
+ * place: the levels below and the page, where they exist there. "View all" opens that
+ * list, and "Create …" the create beside it, each where its route check allows it.
  */
-function LevelSwitcher({
-  chain,
-  at,
-  parentReadable,
-  allowed,
-}: {
-  chain: Level[]
-  at: number
-  parentReadable: boolean
-  allowed: Record<string, boolean>
-}) {
+function LevelSwitcher({ chain, at, allowed }: { chain: Level[]; at: number; allowed: Record<string, boolean> }) {
   const level = chain[at]!
   const k = KINDS[level.kind]!
   const root = isRoot(level.kind)
   const list = listPath(chain, at)
-  const allAt = root || parentReadable ? at : 0
-  const all = listPath(chain, allAt)
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [siblings, setSiblings] = useState<Node[] | null>(null)
@@ -215,14 +195,14 @@ function LevelSwitcher({
               {s.display_name}
             </button>
           ))}
-          {(allowed[`create:${at}`] || allowed[`list:${allAt}`]) && <hr />}
+          {(allowed[`create:${at}`] || allowed[`list:${at}`]) && <hr />}
           {allowed[`create:${at}`] && (
             <Link role="menuitem" className="menu-item" to={`${list}#create`} onClick={close}>
               Create {k.label.toLowerCase()}
             </Link>
           )}
-          {allowed[`list:${allAt}`] && (
-            <Link role="menuitem" className="menu-item" to={all} onClick={close}>
+          {allowed[`list:${at}`] && (
+            <Link role="menuitem" className="menu-item" to={list} onClick={close}>
               View all
             </Link>
           )}

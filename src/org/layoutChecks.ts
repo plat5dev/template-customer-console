@@ -11,15 +11,17 @@ export function listPath(chain: Level[], at: number): string {
 }
 
 /**
- * The requests the scope bar's links lead to, for each level, asked in the page's batch
- * with the sidebar's: `overview:{i}` its overview's main call, `list:{i}` the main call
- * of its list ("View all": `GET /user/nodes` at the root), `create:{i}` the create
- * that "Create …" opens.
+ * The scope bar's requests, for each level, asked in the page's batch with the sidebar's:
+ * `read:{i}` the node itself, which names the level; `overview:{i}` its overview's main
+ * call, which its name links to; `list:{i}` the list its ▾ reads and "View all" opens
+ * (`GET /user/nodes` at the root, else the parent's list); `create:{i}` the create that
+ * "Create …" opens.
  */
 export function scopeChecks(chain: Level[]): Record<string, RouteCheck> {
   const out: Record<string, RouteCheck> = {}
   chain.forEach((level, i) => {
     const list = listPath(chain, i)
+    out[`read:${i}`] = { method: "GET", path: level.path }
     out[`overview:${i}`] = { method: "GET", path: `${level.path}/${KINDS[level.kind]!.home}` }
     out[`list:${i}`] = { method: "GET", path: isRoot(level.kind) ? "/user/nodes" : list }
     out[`create:${i}`] = { method: "POST", path: list }

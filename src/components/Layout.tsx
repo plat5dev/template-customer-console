@@ -9,7 +9,7 @@ import { useAuth } from "../auth/AuthContext"
 import { config } from "../config"
 import { rememberScope } from "../org/lastScope"
 import { profileChecks, scopeChecks } from "../org/layoutChecks"
-import { ReportContext, type NodeView } from "../org/nodeView"
+import { ReportContext, ScopeAnswersContext, type NodeView } from "../org/nodeView"
 import { NavChecksContext, type NavChecks, type RouteCheck } from "../org/routeChecks"
 import { applyTheme, loadTheme, type Theme } from "../theme"
 
@@ -67,6 +67,7 @@ export function Layout() {
         .filter(([k]) => k.startsWith(prefix))
         .map(([k, v]) => [k.slice(prefix.length), v]),
     )
+  const scopeAnswers = prefixed("scope:")
 
   // The scope `/` opens next: the innermost node in view, once it's loaded and readable.
   useEffect(() => {
@@ -119,11 +120,13 @@ export function Layout() {
 
       <main className="main">
         <div className="content">
-          {authenticated && chain.length > 0 && <ScopeBar chain={chain} views={views} allowed={prefixed("scope:")} />}
+          {authenticated && chain.length > 0 && <ScopeBar chain={chain} views={views} allowed={scopeAnswers} />}
           <ReportContext.Provider value={report}>
-            <NavChecksContext.Provider value={navChecks}>
-              <Outlet />
-            </NavChecksContext.Provider>
+            <ScopeAnswersContext.Provider value={scopeAnswers}>
+              <NavChecksContext.Provider value={navChecks}>
+                <Outlet />
+              </NavChecksContext.Provider>
+            </ScopeAnswersContext.Provider>
           </ReportContext.Provider>
         </div>
       </main>

@@ -1,17 +1,17 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { Link, Outlet, useParams } from "react-router-dom"
 import { api } from "../api/endpoints"
-import { holds, KINDS, permission } from "../api/tree"
+import { KINDS } from "../api/tree"
 import type { Membership, Node } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { Loading } from "../components/ui"
-import { ReportContext, ScopeContext, type NodeView } from "./nodeView"
+import { ReportContext, ScopeAnswersContext, ScopeContext, type NodeView } from "./nodeView"
 import { useRouteChecks } from "./routeChecks"
 
 /**
- * A route level for one kind: reads the node's slug from the path, loads the
- * caller's membership there (and the node, when they may read it), renders the
- * pages below with it, and reports it to the layout.
+ * A route level for one kind: reads the node's slug from the path, loads the caller's
+ * membership there, and the node once its route check (`read:{depth}`) allows reading
+ * it; renders the pages below with it, and reports it to the layout.
  */
 export function NodeScope({ kind, param }: { kind: string; param: string }) {
   const parents = useContext(ScopeContext)
@@ -22,19 +22,40 @@ export function NodeScope({ kind, param }: { kind: string; param: string }) {
 }
 
 function Loaded({ kind, slug, path, parents }: { kind: string; slug: string; path: string; parents: NodeView[] }) {
+  const depth = parents.length
+  const answers = useContext(ScopeAnswersContext)
+  const readable = answers[`read:${depth}`]
+  const mine = answers["list:0"]
   const [membership, setMembership] = useState<Membership | null>(null)
   const [node, setNode] = useState<Node | null>(null)
+  // A node you can't read is named from the ancestors of one you can.
+  const [named, setNamed] = useState<string | null>(null)
   const [error, setError] = useState<unknown>(null)
 
-  const reload = useCallback(async () => {
-    const m = await api.getMembership(path)
-    setNode(holds(m.permissions, permission.read(kind)) ? await api.getNode(path) : null)
-    setMembership(m)
-  }, [path, kind])
+  const loadMembership = useCallback(async () => setMembership(await api.getMembership(path)), [path])
+  const loadNode = useCallback(async () => setNode(await api.getNode(path)), [path])
 
   useEffect(() => {
-    reload().catch(setError)
-  }, [reload])
+    loadMembership().catch(setError)
+  }, [loadMembership])
+
+  useEffect(() => {
+    if (readable === true) loadNode().catch(setError)
+  }, [readable, loadNode])
+
+  const slugs = [...parents.map((p) => p.slug), slug].join("/")
+  useEffect(() => {
+    if (readable !== false || mine !== true) return
+    // Only the name: without it, the slug shows.
+    api.listMyNodes().then(
+      (nodes) => setNamed(nameAt(nodes, slugs.split("/"))),
+      () => {},
+    )
+  }, [readable, mine, slugs])
+
+  const reload = useCallback(async () => {
+    await Promise.all([loadMembership(), readable === true ? loadNode() : null])
+  }, [loadMembership, loadNode, readable])
 
   const view = useMemo<NodeView | null>(
     () =>
@@ -44,15 +65,13 @@ function Loaded({ kind, slug, path, parents }: { kind: string; slug: string; pat
         path,
         node,
         membership,
-        name: node?.display_name ?? slug,
-        can: (p) => holds(membership.permissions, p),
+        name: node?.display_name ?? named ?? slug,
         reload,
       },
-    [kind, slug, path, node, membership, reload],
+    [kind, slug, path, node, named, membership, reload],
   )
 
   const report = useContext(ReportContext)
-  const depth = parents.length
   useEffect(() => {
     if (!view) return
     report(depth, view)
@@ -67,6 +86,19 @@ function Loaded({ kind, slug, path, parents }: { kind: string; slug: string; pat
       <Outlet />
     </ScopeContext.Provider>
   )
+}
+
+/**
+ * The display name at the last of `slugs`, a path's slugs root first, from a node of
+ * yours that is it or sits below it: its ancestors name each level above it.
+ */
+function nameAt(nodes: Node[], slugs: string[]): string | null {
+  const at = slugs.length - 1
+  for (const n of nodes) {
+    const chain = [...n.ancestors, n]
+    if (chain.length > at && slugs.every((s, i) => chain[i]!.slug === s)) return chain[at]!.display_name
+  }
+  return null
 }
 
 /** A node that didn't load: the error, and a way to your organizations where it's allowed. */

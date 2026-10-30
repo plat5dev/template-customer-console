@@ -8,12 +8,6 @@ type Kind = {
   child: string | null
   /** The page a node opens on: its children, or at the bottom, your API's tasks. */
   home: string
-  /**
-   * The kind's name in permissions (`permission_name` in `plat5.yml`). The starters
-   * give environments `project`: an environment is part of its project, reached through
-   * project:read, project:write and the rest.
-   */
-  permissionName: string
   /** Display names, singular and plural. */
   label: string
   plural: string
@@ -49,7 +43,6 @@ export const KINDS: Record<string, Kind> = {
     parent: null,
     child: "project",
     home: "projects",
-    permissionName: "organization",
     label: "Organization",
     plural: "Organizations",
     marked: false,
@@ -62,7 +55,6 @@ export const KINDS: Record<string, Kind> = {
     parent: "organization",
     child: "environment",
     home: "envs",
-    permissionName: "project",
     label: "Project",
     plural: "Projects",
     marked: false,
@@ -75,7 +67,6 @@ export const KINDS: Record<string, Kind> = {
     parent: "project",
     child: null,
     home: "tasks",
-    permissionName: "project",
     label: "Environment",
     plural: "Environments",
     marked: true,
@@ -141,26 +132,4 @@ export function ancestorPaths(node: Node): (Ancestor & { path: string })[] {
     path += segment(a)
     return { ...a, path }
   })
-}
-
-/** A kind's name in permissions: `{kind}` in Plat5's resources. */
-function named(kind: string): string {
-  return KINDS[kind]!.permissionName
-}
-
-/**
- * The permission identity's node routes require by default to read a node (Plat5's
- * resources), by each kind's permission name: whether `NodeScope` reads the node, and
- * whether the scope bar's level is readable, from its membership. A deployment that
- * overrides it changes it here too. Pages, the sidebar, the scope bar's links and the
- * profile menu ask route checks instead (`src/org/routeChecks.ts`). Either way, the
- * gateway decides.
- */
-export const permission = {
-  read: (kind: string) => `${named(kind)}:read`,
-}
-
-/** Whether a membership's permissions hold one. `*` holds every permission. */
-export function holds(permissions: string[], p: string): boolean {
-  return permissions.includes("*") || permissions.includes(p)
 }
