@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
+import { hasCode } from "../api/client"
 import { api } from "../api/endpoints"
 import { nodeHome, nodePath } from "../api/tree"
 import type { Node } from "../api/types"
@@ -24,6 +25,8 @@ export function OrgsPage() {
   const [deleted, setDeleted] = useState<Node[]>([])
   const [guestNodes, setGuestNodes] = useState<Node[]>([])
   const [error, setError] = useState<unknown>(null)
+  /** Deleted orgs whose restore answered `GRACE_EXPIRED`. */
+  const [expired, setExpired] = useState<ReadonlySet<string>>(new Set())
   const [deletedLoaded, setDeletedLoaded] = useState(false)
   const [guestLoaded, setGuestLoaded] = useState(false)
 
@@ -86,6 +89,8 @@ export function OrgsPage() {
       await api.restoreNode(nodePath(org))
       await Promise.all([refresh(), loadDeleted()])
     } catch (err) {
+      // Past its grace period: the API's message says so, and its Restore goes.
+      if (hasCode(err, "GRACE_EXPIRED")) setExpired((prev) => new Set(prev).add(org.id))
       setError(err)
     }
   }
@@ -157,9 +162,13 @@ export function OrgsPage() {
                         <span className="list-title">{o.display_name}</span>
                         <Status value="deleted" />
                       </span>
-                      <div className="list-meta">Restorable until {new Date(o.purge_after!).toLocaleString()}</div>
+                      <div className="list-meta">
+                        {expired.has(o.id)
+                          ? "Can no longer be restored."
+                          : `Restorable until ${new Date(o.purge_after!).toLocaleString()}`}
+                      </div>
                     </div>
-                    {can.restore && (
+                    {can.restore && !expired.has(o.id) && (
                       <button type="button" className="btn btn-sm" onClick={() => void onRestore(o)}>
                         Restore
                       </button>

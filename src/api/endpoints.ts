@@ -38,7 +38,7 @@ function auditPage(path: string, startingAfter?: string) {
 export const api = {
   // The person: user routes.
   getUser: () => apiFetch<User>("/user"),
-  /** The person's name, or null to clear it. 409 when the deployment's IdP owns names. */
+  /** The person's name, or null to clear it. 409 `NAME_OWNED_BY_IDP` when the deployment's IdP owns names. */
   setName: (name: string | null) => apiFetch<User>("/user", send("PATCH", { name })),
   deleteUser: () => apiFetch<void>("/user", send("DELETE")),
   /** The nodes of a kind the person can see, across every tree; every kind without one. `deleted` lists deleted ones. */

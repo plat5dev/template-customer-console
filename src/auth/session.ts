@@ -193,7 +193,7 @@ export function captureInviteQuery(): string | null {
   return fromQuery || peekInviteCookie()
 }
 
-/** Clear cookie + by-state stash. Only call after a successful redeem. */
+/** Clear cookie + by-state stash: after a successful redeem, or one the invite itself refused. */
 export function clearStashedInvite(oauthState?: string | null): void {
   clearInviteCookie()
   if (oauthState) {

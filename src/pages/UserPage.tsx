@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { useLocation } from "react-router-dom"
-import { ApiError } from "../api/client"
+import { hasCode } from "../api/client"
 import { api } from "../api/endpoints"
 import type { AuditEvent, Profile, User } from "../api/types"
 import { useAuth } from "../auth/AuthContext"
@@ -13,7 +13,7 @@ import { useOrgs } from "../org/OrgsContext"
 import { useRouteChecks } from "../org/routeChecks"
 
 /**
- * Set for the session once `PATCH /user` answers 409: the deployment's IdP owns names
+ * Set for the session once `PATCH /user` answers 409 `NAME_OWNED_BY_IDP`: the deployment's IdP owns names
  * (`users.name.sync: each_sign_in`). The app can't read the config, so it learns it here.
  */
 const NAME_FROM_IDP_KEY = "plat5.customer-console.name-from-idp"
@@ -110,7 +110,7 @@ export function UserPage() {
       setNameSaved(true)
       window.dispatchEvent(new Event(USER_CHANGED))
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
+      if (hasCode(err, "NAME_OWNED_BY_IDP")) {
         try {
           sessionStorage.setItem(NAME_FROM_IDP_KEY, "1")
         } catch {

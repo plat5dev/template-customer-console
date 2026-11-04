@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
+import { hasCode } from "../api/client"
 import { api } from "../api/endpoints"
 import { DEFAULT_ENVIRONMENTS, KINDS, nodeHome, nodePath } from "../api/tree"
 import type { Node } from "../api/types"
@@ -12,6 +13,11 @@ import { useRouteChecks } from "../org/routeChecks"
 /**
  * A node's children of one kind: an org's projects, a project's environments. The ones
  * you can see, a create form (at `#create`), and the deleted ones to restore.
+ *
+ * A restore past the grace period (409 `GRACE_EXPIRED`) leaves that one without its
+ * Restore button. A restore or create refused because this page's node was deleted
+ * meanwhile (409 `PARENT_DELETED`) hides both: it's restored first, where
+ * its own parent lists it. The API's `message` says which.
  */
 export function ChildrenPage({ kind }: { kind: string }) {
   const parent = useNodeView()
@@ -27,6 +33,10 @@ export function ChildrenPage({ kind }: { kind: string }) {
   const [name, setName] = useState("")
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<unknown>(null)
+  /** Deleted ones whose restore answered `GRACE_EXPIRED`. */
+  const [expired, setExpired] = useState<ReadonlySet<string>>(new Set())
+  /** This page's node was deleted since it loaded. */
+  const [parentDeleted, setParentDeleted] = useState(false)
 
   // Its requests, checked once the list is in. Restore is asked once deleted ones show.
   // Each listed one's link is asked on its overview's main call.
@@ -77,7 +87,13 @@ export function ChildrenPage({ kind }: { kind: string }) {
     setCreating(true)
     setError(null)
     try {
-      const created = await api.createChild(parent.path, collection, name.trim())
+      let created: Node
+      try {
+        created = await api.createChild(parent.path, collection, name.trim())
+      } catch (err) {
+        if (hasCode(err, "PARENT_DELETED")) setParentDeleted(true)
+        throw err
+      }
       setName("")
       // A new project starts with its environments. Creating them takes the
       // environment kind's create permission: project:create in the starters,
@@ -103,10 +119,12 @@ export function ChildrenPage({ kind }: { kind: string }) {
       await api.restoreNode(nodePath(n))
       await Promise.all([load(), loadDeleted()])
     } catch (err) {
+      if (hasCode(err, "GRACE_EXPIRED")) setExpired((prev) => new Set(prev).add(n.id))
+      // Each one listed here is this page's node's child.
+      if (hasCode(err, "PARENT_DELETED")) setParentDeleted(true)
       setError(err)
     }
   }
-
 
   return (
     <>
@@ -160,10 +178,12 @@ export function ChildrenPage({ kind }: { kind: string }) {
                         <Status value="deleted" />
                       </span>
                       <div className="list-meta">
-                        Restorable until {new Date(c.purge_after!).toLocaleString()}
+                        {expired.has(c.id)
+                          ? "Can no longer be restored."
+                          : `Restorable until ${new Date(c.purge_after!).toLocaleString()}`}
                       </div>
                     </div>
-                    {can.restore && (
+                    {can.restore && !parentDeleted && !expired.has(c.id) && (
                       <button type="button" className="btn btn-sm" onClick={() => void onRestore(c)}>
                         Restore
                       </button>
@@ -174,7 +194,7 @@ export function ChildrenPage({ kind }: { kind: string }) {
             ))}
         </section>
 
-        {can.create && (
+        {can.create && !parentDeleted && (
           <form id="create" className="card" onSubmit={(e) => void onCreate(e)}>
             <div className="card-head">
               <h2>New {noun}</h2>

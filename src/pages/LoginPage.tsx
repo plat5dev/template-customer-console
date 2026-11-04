@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react"
-import { Navigate, useLocation } from "react-router-dom"
+import { Navigate, useLocation, useNavigate } from "react-router-dom"
+import { inviteRefused } from "../api/client"
 import { api } from "../api/endpoints"
 import { nodeHome } from "../api/tree"
 import { useAuth } from "../auth/AuthContext"
 import {
   captureInviteQuery,
   clearStashedInvite,
+  INVITE_QUERY,
   peekStashedInvite,
 } from "../auth/session"
 import { ErrorAlert } from "../components/ErrorAlert"
@@ -17,13 +19,29 @@ let inviteRedeemStarted: string | null = null
 export function LoginPage() {
   const { ready, authenticated, login } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const from =
     (location.state as { from?: string } | null)?.from || "/user"
   const [error, setError] = useState<unknown>(null)
   const [joining, setJoining] = useState(false)
+  /** The invite itself refused the redeem: its stash is cleared, and there's no retry. */
+  const [refused, setRefused] = useState(false)
+  // An invite in the link counts from the first render, so a signed-in person isn't
+  // sent on before the effect below stashes and redeems it.
   const [pendingInvite, setPendingInvite] = useState(
-    () => Boolean(peekStashedInvite()),
+    () => new URLSearchParams(location.search).has(INVITE_QUERY) || Boolean(peekStashedInvite()),
   )
+
+  /** A failed redeem: one the invite refused clears its stash, since trying again can't work. */
+  function redeemFailed(e: unknown) {
+    if (inviteRefused(e)) {
+      clearStashedInvite()
+      setPendingInvite(false)
+      setRefused(true)
+    }
+    setJoining(false)
+    setError(e)
+  }
 
   useEffect(() => {
     if (!ready) return
@@ -43,8 +61,7 @@ export function LoginPage() {
           window.location.replace(nodeHome(node))
         } catch (e: unknown) {
           inviteRedeemStarted = null
-          setJoining(false)
-          setError(e)
+          redeemFailed(e)
         }
       })()
       return
@@ -64,13 +81,31 @@ export function LoginPage() {
     )
   }
 
-  if (authenticated && !pendingInvite && !joining) {
+  if (authenticated && !pendingInvite && !joining && !refused) {
     return <Navigate to={from} replace />
   }
 
   if (joining) {
     return (
       <div className="loading-page">Accepting invite…</div>
+    )
+  }
+
+  if (refused) {
+    return (
+      <div className="center">
+        <div className="card">
+          <div className="card-body">
+            <h1 className="section-title" style={{ fontSize: "1.25rem" }}>
+              This invite can't be used
+            </h1>
+            <ErrorAlert error={error} />
+            <button type="button" className="btn btn-primary btn-block btn-lg" onClick={() => navigate("/orgs")}>
+              Continue
+            </button>
+          </div>
+        </div>
+      </div>
     )
   }
 
@@ -101,8 +136,7 @@ export function LoginPage() {
                     clearStashedInvite()
                     window.location.replace(nodeHome(node))
                   } catch (e: unknown) {
-                    setJoining(false)
-                    setError(e)
+                    redeemFailed(e)
                   }
                 })()
                 return

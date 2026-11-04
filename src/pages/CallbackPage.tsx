@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { inviteRefused } from "../api/client"
 import { api } from "../api/endpoints"
 import { nodeHome } from "../api/tree"
 import {
@@ -13,6 +14,7 @@ let callbackStarted = false
 
 export function CallbackPage() {
   const [error, setError] = useState<unknown>(null)
+  const [refused, setRefused] = useState(false)
 
   useEffect(() => {
     if (callbackStarted) return
@@ -24,10 +26,19 @@ export function CallbackPage() {
         const token = peekStashedInvite(oauthState)
         const returnTo = await completeLogin(window.location.search)
         if (token) {
-          // On failure the cookie and by-state stash stay, so the person can retry.
-          const { node } = await api.redeemInvite(token)
-          clearStashedInvite(oauthState)
-          window.location.replace(nodeHome(node))
+          // On a failure the invite didn't decide, the cookie and by-state stash stay,
+          // so the person can retry. One the invite refused is cleared: it can't work.
+          try {
+            const { node } = await api.redeemInvite(token)
+            clearStashedInvite(oauthState)
+            window.location.replace(nodeHome(node))
+          } catch (e: unknown) {
+            if (inviteRefused(e)) {
+              clearStashedInvite(oauthState)
+              setRefused(true)
+            }
+            throw e
+          }
           return
         }
         window.location.replace(returnTo || "/")
@@ -42,13 +53,15 @@ export function CallbackPage() {
       <div className="center">
         <div className="card">
           <div className="card-body">
-            <h1 className="section-title">Sign-in failed</h1>
+            <h1 className="section-title">{refused ? "This invite can't be used" : "Sign-in failed"}</h1>
             <ErrorAlert error={error} />
             <div className="cluster">
-              <a className="btn btn-primary" href="/login">
-                Try again
-              </a>
-              <a className="btn" href="/orgs">
+              {!refused && (
+                <a className="btn btn-primary" href="/login">
+                  Try again
+                </a>
+              )}
+              <a className={refused ? "btn btn-primary" : "btn"} href="/orgs">
                 Organizations
               </a>
             </div>

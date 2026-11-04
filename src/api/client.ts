@@ -33,6 +33,20 @@ export class ApiError extends Error {
   }
 }
 
+/** Whether `err` is the API's error with this `code` (`errors.md` in Plat5's reference). */
+export function hasCode(err: unknown, code: string): err is ApiError {
+  return err instanceof ApiError && err.code === code
+}
+
+/**
+ * Whether a redeem was refused by the invite itself, so trying it again can't work:
+ * an unknown token (404), or one that's redeemed, revoked, expired or whose node is
+ * deleted (409 `INVITE_NOT_REDEEMABLE`).
+ */
+export function inviteRefused(err: unknown): err is ApiError {
+  return err instanceof ApiError && (err.status === 404 || err.code === "INVITE_NOT_REDEEMABLE")
+}
+
 export type TokenProvider = () => Promise<string | null>
 
 /** `bearer` sends that credential instead of the person's sign-in token. */

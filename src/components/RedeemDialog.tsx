@@ -67,7 +67,7 @@ export function RedeemDialog({ onClose }: { onClose: () => void }) {
               value={text}
               onChange={(e) => setText(e.target.value)}
               required
-              placeholder="https://…/login?invite=inv_…"
+              placeholder="https://…/login?invite=…"
             />
             <span className="hint">The link someone shared with you, or the token in it.</span>
           </div>

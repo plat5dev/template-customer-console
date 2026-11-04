@@ -17,6 +17,14 @@ const EXPIRES: { label: string; value: string }[] = [
   { label: "30 days", value: "30d" },
 ]
 
+/** How many redeems an invite takes; `null` is unlimited. */
+const USES: { label: string; value: number | null }[] = [
+  { label: "Once", value: 1 },
+  { label: "5 times", value: 5 },
+  { label: "25 times", value: 25 },
+  { label: "Unlimited", value: null },
+]
+
 /**
  * Invite links to this node. To the org: a role there, and roles on projects
  * (`grants`) on redeem. Below the org, to a project or an environment: a role
@@ -32,6 +40,7 @@ export function InvitesPage() {
   const [role, setRole] = useState("")
   const [grants, setGrants] = useState<Record<string, string>>({})
   const [expiresIn, setExpiresIn] = useState("7d")
+  const [maxUses, setMaxUses] = useState<number | null>(1)
   const [creating, setCreating] = useState(false)
   const [created, setCreated] = useState<CreatedInvite | null>(null)
   const [copied, setCopied] = useState<"link" | "token" | null>(null)
@@ -105,6 +114,7 @@ export function InvitesPage() {
         .map(([node_id, r]) => ({ node_id, role: r }))
       const invite = await api.createInvite(view.path, {
         role,
+        max_uses: maxUses,
         expires_in: expiresIn,
         ...(granted.length > 0 ? { grants: granted } : {}),
       })
@@ -172,7 +182,7 @@ export function InvitesPage() {
                       <div className="list-meta">
                         {inv.grants.length > 0 &&
                           `${inv.grants.map((g) => `${g.role} on ${projectName(g.node_id)}`).join(", ")} · `}
-                        {`used ${inv.use_count}/${inv.max_uses === "unlimited" ? "∞" : inv.max_uses}`}
+                        {`used ${inv.use_count}/${inv.max_uses === null ? "∞" : inv.max_uses}`}
                         {` · expires ${new Date(inv.expires_at).toLocaleString()}`}
                       </div>
                     </div>
@@ -225,6 +235,22 @@ export function InvitesPage() {
                     ))}
                   </div>
                 )}
+                <div className="field">
+                  <label htmlFor="invite_uses">Uses</label>
+                  <select
+                    id="invite_uses"
+                    className="select"
+                    value={maxUses ?? "unlimited"}
+                    onChange={(e) => setMaxUses(e.target.value === "unlimited" ? null : Number(e.target.value))}
+                  >
+                    {USES.map((opt) => (
+                      <option key={opt.label} value={opt.value ?? "unlimited"}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="hint">Each redeem that gives someone a role is a use.</span>
+                </div>
                 <div className="field">
                   <label htmlFor="invite_expires">Expires</label>
                   <select
