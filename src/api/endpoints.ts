@@ -21,7 +21,7 @@ import type {
 } from "./types"
 
 // Every call the app makes, through the gateway with the person's sign-in token.
-// A node is addressed by its path, by slug: `/orgs/acme`, `/orgs/acme/projects/web/envs/production`.
+// A node is addressed by its path, by slug: `/orgs/acme`, `/orgs/acme/projects/web`.
 
 function send(method: string, body?: unknown): RequestInit {
   return body === undefined ? { method } : { method, body: JSON.stringify(body) }
@@ -123,12 +123,14 @@ export const api = {
   /** A node's log, and everything below it, newest first. */
   listAuditEvents: (path: string, startingAfter?: string) => auditPage(`${path}/audit-events`, startingAfter),
 
-  // Your API: tasks inside an environment.
-  listTasks: (envPath: string) => listAll<Task>(`${envPath}/tasks`, "tasks"),
-  createTask: (envPath: string, title: string) => apiFetch<Task>(`${envPath}/tasks`, send("POST", { title })),
-  updateTask: (envPath: string, taskId: string, body: { title?: string; status?: TaskStatus }) =>
-    apiFetch<Task>(`${envPath}/tasks/${taskId}`, send("PATCH", body)),
-  deleteTask: (envPath: string, taskId: string) => apiFetch<void>(`${envPath}/tasks/${taskId}`, send("DELETE")),
+  // Your API: tasks inside a project.
+  listTasks: (projectPath: string) => listAll<Task>(`${projectPath}/tasks`, "tasks"),
+  createTask: (projectPath: string, title: string) =>
+    apiFetch<Task>(`${projectPath}/tasks`, send("POST", { title })),
+  updateTask: (projectPath: string, taskId: string, body: { title?: string; status?: TaskStatus }) =>
+    apiFetch<Task>(`${projectPath}/tasks/${taskId}`, send("PATCH", body)),
+  deleteTask: (projectPath: string, taskId: string) =>
+    apiFetch<void>(`${projectPath}/tasks/${taskId}`, send("DELETE")),
 
   /** Any gateway path, with a credential other than the sign-in (the Learn page's probes). */
   probe: <T>(path: string, bearer?: string) => apiFetch<T>(path, bearer ? { bearer } : {}),

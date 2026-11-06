@@ -12,7 +12,7 @@ import { Menu } from "./Menu"
 const SEARCH_OVER = 8
 
 /**
- * Where you are, a segment per level of the path: `Acme ▾ / Web ▾ / live ▾`. Route
+ * Where you are, a segment per level of the path: `Acme ▾ / Web ▾`. Route
  * checks alone decide each part: a level's name links to its overview where the
  * overview's main call is allowed, and ▾ switches to a sibling where the list it reads
  * is. A guest's org links to its overview, the projects they can see. `allowed` holds
@@ -79,7 +79,7 @@ export function ScopeBar({
             </span>
           )}
           <span
-            className={`scope-seg${KINDS[l.kind]!.marked ? " marked" : ""}${i === current ? " current" : ""}`}
+            className={`scope-seg${i === current ? " current" : ""}`}
             data-kind={l.kind}
           >
             {l.linked ? (

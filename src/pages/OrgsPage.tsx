@@ -132,7 +132,7 @@ export function OrgsPage() {
             <div className="stack-sm">
               <h2 className="section-title">Elsewhere</h2>
               <p className="section-lede">
-                Projects and environments you can reach in organizations you can't open, as a guest.
+                Projects you can reach in organizations you can't open, as a guest.
               </p>
               <div className="list">
                 {guestNodes.map((n) => (

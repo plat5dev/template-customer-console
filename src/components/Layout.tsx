@@ -149,7 +149,7 @@ function nodePages({ kind, path: at }: { kind: string; path: string }): Page[] {
       ? {
           key: "children",
           to: `${at}/${KINDS[k.child]!.collection}`,
-          icon: k.child === "environment" ? "envs" : "projects",
+          icon: "projects",
           label: KINDS[k.child]!.plural,
           end: true,
           check: get(`${at}/${KINDS[k.child]!.collection}`),

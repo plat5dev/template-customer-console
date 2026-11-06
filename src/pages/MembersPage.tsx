@@ -170,7 +170,7 @@ export function MembersPage() {
               <TextLink allowed={can.access} to={`${org.path}/bindings`}>
                 Access
               </TextLink>
-              . A guest has roles only below the org, on projects or environments. To invite people by link, use{" "}
+              . A guest has roles only below the org, on projects. To invite people by link, use{" "}
               <TextLink allowed={can.invites} to={`${org.path}/invites`}>
                 Invites
               </TextLink>

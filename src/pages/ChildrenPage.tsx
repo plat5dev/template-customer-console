@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { hasCode } from "../api/client"
 import { api } from "../api/endpoints"
-import { DEFAULT_ENVIRONMENTS, KINDS, nodeHome, nodePath } from "../api/tree"
+import { KINDS, nodeHome, nodePath } from "../api/tree"
 import type { Node } from "../api/types"
 import { ErrorAlert } from "../components/ErrorAlert"
 import { NodeHead } from "../components/NodeHead"
@@ -11,8 +11,8 @@ import { useNodeView } from "../org/nodeView"
 import { useRouteChecks } from "../org/routeChecks"
 
 /**
- * A node's children of one kind: an org's projects, a project's environments. The ones
- * you can see, a create form (at `#create`), and the deleted ones to restore.
+ * A node's children of one kind: an org's projects. The ones you can see, a create
+ * form (at `#create`), and the deleted ones to restore. A new one opens on its home.
  *
  * A restore past the grace period (409 `GRACE_EXPIRED`) leaves that one without its
  * Restore button. A restore or create refused because this page's node was deleted
@@ -95,17 +95,7 @@ export function ChildrenPage({ kind }: { kind: string }) {
         throw err
       }
       setName("")
-      // A new project starts with its environments. Creating them takes the
-      // environment kind's create permission: project:create in the starters,
-      // which whoever just created the project holds.
-      if (kind === "project") {
-        for (const env of DEFAULT_ENVIRONMENTS) {
-          await api.createChild(nodePath(created), KINDS.environment!.collection, env)
-        }
-        navigate(nodeHome(created))
-        return
-      }
-      await load()
+      navigate(nodeHome(created))
     } catch (err) {
       setError(err)
     } finally {
@@ -213,7 +203,6 @@ export function ChildrenPage({ kind }: { kind: string }) {
                 />
                 <span className="hint">
                   Its slug, for the path, comes from the name and never changes.
-                  {kind === "project" && ` It starts with ${DEFAULT_ENVIRONMENTS.join(" and ")} environments.`}
                 </span>
               </div>
               <button

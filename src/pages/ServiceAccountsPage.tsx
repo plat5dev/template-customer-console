@@ -12,8 +12,8 @@ import { useRouteChecks } from "../org/routeChecks"
 
 /**
  * Members for machines that belong to this node: CI, a backend job, an integration.
- * They belong to an org, for automation across it, or to an environment, for that
- * environment's keys, and are deleted with it.
+ * They belong to an org, for automation across it, or to a project, for that
+ * project's keys, and are deleted with it.
  */
 export function ServiceAccountsPage() {
   const view = useNodeView()

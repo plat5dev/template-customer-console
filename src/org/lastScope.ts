@@ -1,4 +1,4 @@
-// The node you were in last, by path (`/orgs/acme/projects/web/envs/live`), so `/`
+// The node you were in last, by path (`/orgs/acme/projects/web`), so `/`
 // opens it again. A convenience: storage that fails or is blocked is no stored scope.
 
 const KEY = "plat5.customer-console.last-scope"

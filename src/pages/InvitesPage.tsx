@@ -27,8 +27,8 @@ const USES: { label: string; value: number | null }[] = [
 
 /**
  * Invite links to this node. To the org: a role there, and roles on projects
- * (`grants`) on redeem. Below the org, to a project or an environment: a role
- * there, which makes someone outside the org a guest. Plat5 sends no email; you share the link.
+ * (`grants`) on redeem. Below the org, to a project: a role there, which makes
+ * someone outside the org a guest. Plat5 sends no email; you share the link.
  */
 export function InvitesPage() {
   const view = useNodeView()

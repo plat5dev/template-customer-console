@@ -160,7 +160,7 @@ export type TaskStatus = "todo" | "in_progress" | "done"
 /** Your API's task. `created_by` is the member id of whoever created it. */
 export type Task = {
   id: string
-  environment_id: string
+  project_id: string
   title: string
   status: TaskStatus
   created_by: string

@@ -11,31 +11,28 @@ type Kind = {
   /** Display names, singular and plural. */
   label: string
   plural: string
-  /** Whether the scope bar sets the level apart: the environment, whose data your API serves. */
-  marked: boolean
   /**
    * Whether service accounts belong at this kind. The starters' services/identity.yml
-   * turns them off at projects: they belong to an org, for automation across it, or to
-   * an environment, for that environment's keys.
+   * has them at both: an org's, for automation across it, and a project's, for its keys.
    */
   serviceAccounts: boolean
   /**
-   * Whether people are invited at this kind. The starters' services/identity.yml turns
-   * invites off at environments: people join an org, or a project as a guest.
+   * Whether people are invited at this kind. The starters' services/identity.yml has
+   * invites at both: people join an org, or a project as a guest.
    */
   invites: boolean
   /**
-   * Whether roles are given here. The starters' services/identity.yml turns off new
-   * bindings at environments: people aren't bound there, and a service account gets its
-   * role when it's created.
+   * Whether roles are given here (`POST …/bindings`). The starters' services/identity.yml
+   * has it at both. Where it's off, people reach the node through roles above it, and a
+   * service account gets its role when it's created.
    */
   bindings: boolean
 }
 
 /**
- * The deployment's kinds, as `plat5.yml` declares them (organization > project >
- * environment), and how this app shows each. Console paths are the gateway's paths, by
- * slug.
+ * The deployment's kinds, as `plat5.yml` declares them (organization > project), and how
+ * this app shows each. The project is the bottom of the tree, whose data your API
+ * serves: its tasks. Console paths are the gateway's paths, by slug.
  */
 export const KINDS: Record<string, Kind> = {
   organization: {
@@ -45,7 +42,6 @@ export const KINDS: Record<string, Kind> = {
     home: "projects",
     label: "Organization",
     plural: "Organizations",
-    marked: false,
     serviceAccounts: true,
     invites: true,
     bindings: true,
@@ -53,30 +49,17 @@ export const KINDS: Record<string, Kind> = {
   project: {
     collection: "projects",
     parent: "organization",
-    child: "environment",
-    home: "envs",
+    child: null,
+    home: "tasks",
     label: "Project",
     plural: "Projects",
-    marked: false,
-    serviceAccounts: false,
+    serviceAccounts: true,
     invites: true,
     bindings: true,
   },
-  environment: {
-    collection: "envs",
-    parent: "project",
-    child: null,
-    home: "tasks",
-    label: "Environment",
-    plural: "Environments",
-    marked: true,
-    serviceAccounts: true,
-    invites: false,
-    bindings: false,
-  },
 }
 
-/** The kinds root first: organization, project, environment. */
+/** The kinds root first: organization, project. */
 export const CHAIN: string[] = (() => {
   const out: string[] = []
   let k: string | null = Object.keys(KINDS).find((n) => KINDS[n]!.parent === null) ?? null
@@ -87,9 +70,6 @@ export const CHAIN: string[] = (() => {
   return out
 })()
 
-/** The environments a new project starts with, created by this app right after it. */
-export const DEFAULT_ENVIRONMENTS = ["Production", "Development"]
-
 export function isRoot(kind: string): boolean {
   return KINDS[kind]!.parent === null
 }
@@ -98,12 +78,12 @@ function segment(n: Ancestor | Node): string {
   return `/${KINDS[n.kind]!.collection}/${n.slug}`
 }
 
-/** A node's path from its chain: `/orgs/acme/projects/web/envs/production`. */
+/** A node's path from its chain: `/orgs/acme/projects/web`. */
 export function nodePath(node: Node): string {
   return node.ancestors.map(segment).join("") + segment(node)
 }
 
-/** Where a node opens in this app: its children, or an environment's tasks. */
+/** Where a node opens in this app: its children, or a project's tasks. */
 export function nodeHome(node: Node): string {
   return `${nodePath(node)}/${KINDS[node.kind]!.home}`
 }

@@ -705,31 +705,6 @@ a.scope-label:hover {
   color: var(--text);
 }
 
-/* The environment: where your API's data is, set apart. */
-.scope-seg.marked {
-  padding-left: 0.25rem;
-  border-radius: 999px;
-  background: var(--accent-wash);
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
-
-.scope-seg.marked .scope-label {
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
-  color: var(--accent-text);
-}
-
-.scope-seg.marked a.scope-label:hover,
-.scope-seg.marked .scope-switch:hover,
-.scope-seg.marked .scope-switch[aria-expanded="true"] {
-  border-radius: 999px;
-  background: var(--accent-wash);
-}
-
-.scope-seg.marked .chevron {
-  border-color: var(--accent-text);
-}
-
 /* The levels above the current one, for phone width. */
 .scope-up {
   display: none;

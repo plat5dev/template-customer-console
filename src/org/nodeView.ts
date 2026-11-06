@@ -5,7 +5,7 @@ import type { Membership, Node } from "../api/types"
 export type NodeView = {
   kind: string
   slug: string
-  /** The gateway path, which is also this app's: `/orgs/acme/projects/web/envs/production`. */
+  /** The gateway path, which is also this app's: `/orgs/acme/projects/web`. */
   path: string
   /** Null when the node's route check doesn't allow reading it, like a guest's org. */
   node: Node | null
@@ -33,7 +33,7 @@ export const ReportContext = createContext<(depth: number, view: NodeView | null
  */
 export const ScopeAnswersContext = createContext<Record<string, boolean>>({})
 
-/** Every node in view, root first: the org, then the project, then the environment. */
+/** Every node in view, root first: the org, then the project. */
 export function useNodeViews(): NodeView[] {
   return useContext(ScopeContext)
 }

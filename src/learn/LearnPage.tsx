@@ -28,7 +28,7 @@ export function LearnPage() {
       <PageHead
         eyebrow="/learn"
         title="How it works"
-        lede="This app signs people in, works inside organizations, their projects and their environments, and calls your API, and the API writes none of the sign-in, membership, or permission code. Plat5's gateway does. Here is how."
+        lede="This app signs people in, works inside organizations and their projects, and calls your API, and the API writes none of the sign-in, membership, or permission code. Plat5's gateway does. Here is how."
       />
 
       <Section title="One credential">
@@ -41,10 +41,10 @@ export function LearnPage() {
 
       <Section title="The path names the node">
         <p>
-          The tree is organizations, projects inside them, and environments inside those. Paths carry slugs:{" "}
-          <code>/orgs/acme/projects/web/envs/production/tasks</code>. This app's pages use the same paths. The
-          gateway resolves the slugs, checks your roles there, and calls your API at{" "}
-          <code>/environments/{"{environment_id}"}/tasks</code> with your member id in{" "}
+          The tree is organizations, and projects inside them. Paths carry slugs:{" "}
+          <code>/orgs/acme/projects/web/tasks</code>. This app's pages use the same paths. The gateway resolves
+          the slugs, checks your roles there, and calls your API at{" "}
+          <code>/projects/{"{project_id}"}/tasks</code> with your member id in{" "}
           <code>X-Plat5-Member-Id</code>. Your API never sees a token, a slug, or who you are
           outside that org.
         </p>
@@ -75,8 +75,8 @@ export function LearnPage() {
       <Section title="Lists show what you can see">
         <p>
           <code>GET /user/nodes?kind=organization</code> is the org switcher. <code>GET /orgs/{"{organization}"}/projects</code>{" "}
-          returns the projects you can read, so someone with a role on one project sees that one, and its
-          environments. Lists page with{" "}
+          returns the projects you can read, so someone with a role on one project sees that one. Lists page
+          with{" "}
           <code>has_more</code>; this app walks every page.
         </p>
       </Section>
@@ -91,13 +91,13 @@ export function LearnPage() {
           <strong>Invites</strong> are links to this app's <code>/login?invite=</code>. The token stays in the
           browser while you sign in, then <code>POST /user/invites/redeem</code> joins you and names where to go.
           Plat5 sends no email. <strong>Service accounts</strong> are members for machines, with roles and keys of
-          their own. They belong to the org, for automation across it, or to an environment, for its keys.
+          their own. They belong to the org, for automation across it, or to a project, for its keys.
         </p>
       </Section>
 
       <Section title="Deleting is soft">
         <p>
-          A deleted org, project or environment can be restored until its <code>purge_after</code>: <code>?status=deleted</code>{" "}
+          A deleted org or project can be restored until its <code>purge_after</code>: <code>?status=deleted</code>{" "}
           lists them, <code>POST …/restore</code> brings one back with everything in it.
         </p>
       </Section>
@@ -106,7 +106,7 @@ export function LearnPage() {
         <p>
           The gateway records every write: who, where, and how it ended; your API adds what changed with{" "}
           <code>X-Plat5-Audit-Details</code>. An org's log is <code>GET /orgs/{"{organization}"}/audit-events</code>,
-          a project's or an environment's is under it, and yours is <code>GET /user/audit-events</code>.
+          a project's is under it, and yours is <code>GET /user/audit-events</code>.
         </p>
       </Section>
 

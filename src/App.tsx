@@ -22,7 +22,7 @@ import { UserKeysPage } from "./pages/UserKeysPage"
 import { UserPage } from "./pages/UserPage"
 
 // Paths mirror the gateway's, by slug: /user/…, /orgs/{organization}/…,
-// /orgs/{organization}/projects/{project}/…, and …/envs/{environment}/….
+// and /orgs/{organization}/projects/{project}/….
 export default function App() {
   return (
     <BrowserRouter>
